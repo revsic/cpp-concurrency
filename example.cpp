@@ -69,8 +69,11 @@ ull par_sizeof_dir(const fs::path& path) {
 
 int main(int argc, char* argv[])
 {
-    std::string given;
-    std::cin >> given;
+    if (argc < 2) {
+        std::cout << "Usage: ./concurrency_example [DIR_PATH]" << std::endl;
+        return 1;
+    }
+    std::string given = argv[1];
 
     fs::path path(given);
     if (!fs::exists(path)) {
