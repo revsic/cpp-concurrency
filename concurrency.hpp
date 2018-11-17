@@ -1,3 +1,6 @@
+#ifndef CONCURRENCY_HPP
+#define CONCURRENCY_HPP
+
 #include <atomic>
 #include <condition_variable>
 #include <future>
@@ -6,6 +9,11 @@
 #include <optional>
 #include <thread>
 #include <type_traits>
+
+#define CHANNEL_HPP
+#define THREAD_POOL_HPP
+#define WAIT_GROUP_HPP
+
 
 template <typename T,
           typename = std::enable_if_t<std::is_default_constructible_v<T>>>
@@ -144,6 +152,7 @@ private:
 template <typename T>
 using UChannel = Channel<T, std::list<T>>;
 
+
 template <typename T>
 class ThreadPool {
 public:
@@ -202,6 +211,7 @@ private:
     Channel<std::packaged_task<T()>> channel;
 };
 
+
 using ull = unsigned long long;
 
 class WaitGroup {
@@ -237,3 +247,6 @@ public:
 private:
     std::atomic<ull> visit;
 };
+
+
+#endif
