@@ -50,9 +50,11 @@ auto fut = std::async(std::launch::async, [&]{
     for (int i = 0; i < 3; ++i) {
         channel.Add(i);
     }
+    channel.Close();
 });
 
 for (auto const& elem : channel) {
     std::cout << elem << ' ';
 }
+std::cout << std::endl;
 ```
