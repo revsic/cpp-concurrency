@@ -42,8 +42,9 @@ public:
         }
     }
 
-    std::future<T> Add(std::function<T()>&& task) {
-        std::packaged_task<T()> ptask(std::move(task));
+    template <typename F>
+    std::future<T> Add(F&& task) {
+        std::packaged_task<T()> ptask(std::forward<F>(task));
         std::future<T> fut = ptask.get_future();
         channel.Add(std::move(ptask));
         return fut;
