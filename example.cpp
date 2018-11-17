@@ -3,7 +3,6 @@
 #include <chrono>
 #include <filesystem>
 #include <iostream>
-#include <list>
 
 namespace fs = std::filesystem;
 namespace chrono = std::chrono;
@@ -54,7 +53,6 @@ ull par_sizeof_dir(const fs::path& path) {
             return size;
         }));
     }
-
 
     wg.Add();
     channel.Add(path);
