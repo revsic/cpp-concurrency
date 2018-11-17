@@ -43,7 +43,7 @@ std::optional<std::string> res = channel.Get();
 assert(res.value() == "test");
 ```
 
-Golang like range iteration.
+Golang style channel range iteration.
 ```C++
 UChannel<int> channel;
 auto fut = std::async(std::launch::async, [&]{ 
@@ -57,4 +57,45 @@ for (auto const& elem : channel) {
     std::cout << elem << ' ';
 }
 std::cout << std::endl;
+```
+
+## Thread Pool
+
+ThreadPool Constructor
+- num_threads: number of thread (default std::thread::hardware_concurrency)
+- size_buffer: size of task buffer (default 1)
+
+If task buffer exhausted, block adding new tasks and wait for existing tasks to terminated.
+
+Add new tasks and get return value from future.
+```C++
+ThreadPool<int> pool;
+auto fut = pool.Add([]{
+    int sum = 0;
+    for (int i = 0; i < 5; ++i) {
+        sum += i;
+    }
+    return sum;
+});
+
+assert(fut.get() == 1 + 2 + 3 + 4);
+```
+
+## Wait Group
+
+Wait until all visits are done.
+
+```C++
+WaitGroup wg;
+wg.Add();
+
+auto fut = std::async(std::launch::async, []{
+    std::this_thread::sleep(2s);
+    wg.Done();
+});
+
+auto start = std::chrono::steady_clock::now();
+wg.Wait();
+auto end = std::chrono::steady_clock::now();
+std::cout << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() << std::endl;
 ```
