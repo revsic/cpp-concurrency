@@ -23,8 +23,8 @@ WaitGroup wg;
 
 Calculate directory size concurrently.
 ```
-cd sample;
-mkdir build && pushd build;
+cd sample && mkdir build;
+pushd build;
 cmake .. && make;
 ./concurrency_example $YOUR_DIRECTORY
 popd
