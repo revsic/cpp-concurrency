@@ -1,2 +1,2 @@
-# cpp-golang-style-concurrency
+# cpp-concurrency
 cpp implementation of golang style concurrency
