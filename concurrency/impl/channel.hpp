@@ -12,7 +12,7 @@ template <typename T,
           typename = std::enable_if_t<std::is_default_constructible_v<T>>>
 class RingBuffer {
 public:
-    RingBuffer() : size_buffer(0), buffer(nullptr) {
+    RingBuffer() : RingBuffer(1) {
         // Do Nothing
     }
 
@@ -80,6 +80,12 @@ public:
         cv.notify_all();
     }
 
+    template <typename U>
+    Channel& operator<<(U&& task) {
+        Add(std::forward<U>(task));
+        return *this;
+    }
+
     std::optional<T> Get() {
         std::unique_lock lock(mtx);
         cv.wait(lock, [&]{ return !runnable || buffer.size() > 0; });
@@ -91,6 +97,19 @@ public:
 
         cv.notify_all();
         return std::optional<T>(std::move(given));
+    }
+
+    Channel& operator>>(std::optional<T>& get) {
+        get = Get();
+        return *this;
+    }
+
+    Channel& operator>>(T& get) {
+        std::optional<T> res = Get();
+        if (res.has_value()) {
+            get = std::move(res.value());
+        }
+        return *this;
     }
 
     void Close() {
