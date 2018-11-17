@@ -30,12 +30,6 @@ public:
         }
     }
 
-    template <typename F>
-    auto Wait(F&& func) {
-        Wait();
-        return func();
-    }
-
 private:
     std::atomic<ull> visit;
 };
