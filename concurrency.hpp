@@ -153,21 +153,19 @@ template <typename T>
 using UChannel = Channel<T, std::list<T>>;
 
 
-template <typename T>
+template <typename T,
+          typename Container = RingBuffer<std::packaged_task<T()>>>
 class ThreadPool {
 public:
     ThreadPool() : ThreadPool(std::thread::hardware_concurrency()) {
         // Do Nothing
     }
 
-    ThreadPool(size_t num_threads) : ThreadPool(num_threads, 1) {
-        // Do Nothing
-    }
-
-    ThreadPool(size_t num_threads, size_t size_buffer) :
+    template <typename... Args>
+    ThreadPool(size_t num_threads, Args&&... args) :
         num_threads(num_threads),
         threads(std::make_unique<std::thread[]>(num_threads)),
-        channel(size_buffer)
+        channel(std::forward<Args>(args)...)
     {
         for (size_t i = 0; i < num_threads; ++i) {
             threads[i] = std::thread([this]{ 
@@ -208,8 +206,11 @@ private:
     bool runnable = true;
     size_t num_threads;
     std::unique_ptr<std::thread[]> threads;
-    Channel<std::packaged_task<T()>> channel;
+    Channel<std::packaged_task<T()>, Container> channel;
 };
+
+template <typename T>
+using UThreadPool = ThreadPool<T, std::list<std::packaged_task<T()>>>;
 
 
 using ull = unsigned long long;
