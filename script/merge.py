@@ -163,9 +163,9 @@ def write_hpp(outfile, info):
         if include not in unique_include:
             unique_include.append(include)
 
-    includes = os.linesep.join(
+    includes = '\n'.join(
         '#include <{}>'.format(x) for x in sorted(unique_include)) + '\n'
-    defines = os.linesep.join(
+    defines = '\n'.join(
         '#define {}'.format(x) for x in info.defines) + '\n'
 
     out = Format.hpp.format(guard_name, includes, defines, info.out)
