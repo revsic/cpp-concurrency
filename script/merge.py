@@ -76,7 +76,12 @@ def merge(outfile, dirname):
             includes += dep_include + include
             done.append(full_path)
 
-    includes = os.linesep.join('#include <{}>'.format(x) for x in includes) + '\n'
+    unique_include = []
+    for include in includes:
+        if include not in unique_include:
+            unique_include.append(include)
+
+    includes = os.linesep.join('#include <{}>'.format(x) for x in sorted(unique_include)) + '\n'
 
     with open(outfile, 'w') as f:
         f.write(includes)
