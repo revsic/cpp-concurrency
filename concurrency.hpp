@@ -91,7 +91,7 @@ public:
         std::unique_lock lock(mtx);
         cv.wait(lock, [&]{ return !runnable || buffer.size() > 0; });
 
-        if (!runnable) return std::nullopt;
+        if (!runnable && buffer.size() == 0) return std::nullopt;
 
         T given = std::move(buffer.front());
         buffer.pop_front();
