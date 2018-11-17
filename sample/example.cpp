@@ -23,48 +23,48 @@ ull sizeof_dir(const fs::path& path) {
 }
 
 ull par_sizeof_dir(const fs::path& path) {
-    if (fs::is_regular_file(path)) {
-        return fs::file_size(path);
-    }
-    if (!fs::is_directory(path)) {
-        return 0;
-    }
+    WaitGroup wg = 1;
+    UChannel<ull> channel;
+    UThreadPool<void> pool;
 
-    ThreadPool<ull> pool;
-    UChannel<fs::path> channel;
-
-    WaitGroup wg;
-    std::vector<std::future<ull>> fut_vec;
-    for (size_t i = 0; i < pool.GetNumThreads(); ++i) {
-        fut_vec.emplace_back(pool.Add([&]{
-            ull size = 0;
-            for (auto const& path : channel) {
-                for (auto const& dir : fs::directory_iterator(path)) {
-                    if (dir.is_regular_file()) {
-                        size += dir.file_size();
-                    }
-                    else if (dir.is_directory()) {
-                        wg.Add();
-                        channel.Add(dir.path());
-                    }
+    std::function<void(fs::path const&)> par = [&](fs::path const& path) {
+        if (fs::is_regular_file(path)) {
+            channel << fs::file_size(path);
+            return;
+        }
+        if (fs::is_directory(path)) {
+            ull res = 0;
+            for (auto const& dir : fs::directory_iterator(path)) {
+                if (dir.is_regular_file()) {
+                    res += dir.file_size();
                 }
-                wg.Done();
+                else if (dir.is_directory()) {
+                    wg.Add();
+                    pool.Add([&, path=dir.path()]{ par(path); });
+                }
             }
-            return size;
-        }));
+            channel << res;
+            if (wg.Done() == 0) {
+                channel.Close();
+            }
+        }
+    };
+    par(path);
+
+    ull res = 0;
+    for (auto const& size : channel) {
+        res += size;
     }
+    return res;
+}
 
-    wg.Add();
-    channel.Add(path);
+template <typename T, typename F, typename... Args>
+auto perf(F&& func, Args&&... args) {
+    auto start = chrono::steady_clock::now();
+    auto res = func(std::forward<Args>(args)...);
+    auto end = chrono::steady_clock::now();
 
-    wg.Wait();
-    channel.Close();
-
-    ull size = 0;
-    for (auto& f : fut_vec) {
-        size += f.get();
-    }
-    return size;
+    return std::make_tuple(res, chrono::duration_cast<T>(end - start));
 }
 
 int main(int argc, char* argv[])
@@ -76,24 +76,20 @@ int main(int argc, char* argv[])
     std::string given = argv[1];
 
     fs::path path(given);
-    if (!fs::exists(path)) {
-        std::cout << "invalid file path" << std::endl;
+    if (!fs::exists(path) || !fs::is_directory(path)) {
+        std::cout << "invalid directory path" << std::endl;
         return 1;
     }
 
-    auto unpar_start = chrono::steady_clock::now();
-    ull unpar_size = sizeof_dir(path);
-    auto unpar_end = chrono::steady_clock::now();
+    auto list = { sizeof_dir, par_sizeof_dir };
+    auto log = [](auto&& tup){
+        auto[res, dur] = std::move(tup);
+        std::cout << "size: " << res << " / time: " << dur.count() << "ns\n";
+    };
 
-    auto unpar_dur = chrono::duration_cast<chrono::nanoseconds>(unpar_end - unpar_start).count();
-    std::cout << "size: " << unpar_size << " / time: " << unpar_dur << "ns" << std::endl;
-
-    auto par_start = chrono::steady_clock::now();
-    ull par_size = par_sizeof_dir(path);
-    auto par_end = chrono::steady_clock::now();
-
-    auto par_dur = chrono::duration_cast<chrono::nanoseconds>(par_end - par_start).count();
-    std::cout << "size: " << par_size << " / time: " << par_dur << "ns" << std::endl;
+    for (auto const& f : list) {
+        log(perf<chrono::nanoseconds>(f, path));
+    }
 
     return 0;
 }
