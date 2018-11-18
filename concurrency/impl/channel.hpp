@@ -99,20 +99,6 @@ public:
         return std::optional<T>(std::move(given));
     }
 
-    std::optional<T> TryGet() {
-        std::optional<T> opt;
-        std::unique_lock lock(mtx);
-        if (lock.try_lock()) {
-            if (buffer.size() > 0) {
-                opt = std::move(buffer.front());
-                buffer.pop_front();
-
-                cv.notify_all();
-            }
-        }
-        return opt;
-    }
-
     Channel& operator>>(std::optional<T>& get) {
         get = Get();
         return *this;
