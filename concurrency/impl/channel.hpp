@@ -22,6 +22,12 @@ public:
         // Do Nothing
     }
 
+    RingBuffer(const RingBuffer&) = delete;
+    RingBuffer(RingBuffer&&) = delete;
+
+    RingBuffer& operator=(const RingBuffer&) = delete;
+    RingBuffer& operator=(RingBuffer&&) = delete;
+
     template <typename... U>
     void emplace_back(U&&... args) {
         buffer[ptr_tail] = T(std::forward<U>(args)...);
@@ -69,6 +75,12 @@ public:
         // Do Nothing
     }
 
+    Channel(const Channel&) = delete;
+    Channel(Channel&&) = delete;
+
+    Channel& operator=(const Channel&) = delete;
+    Channel& operator=(Channel&&) = delete;
+
     template <typename... U>
     void Add(U&&... task) {
         std::unique_lock lock(mtx);
@@ -99,6 +111,18 @@ public:
         return std::optional<T>(std::move(given));
     }
 
+    std::optional<T> TryGet() {
+        std::unique_lock lock(mtx, std::try_to_lock);
+        if (lock.owns_lock() && buffer.size() > 0) {
+            T given = std::move(buffer.front());
+            buffer.pop_front();
+
+            cv.notify_all();
+            return std::optional<T>(std::move(given));
+        }
+        return std::nullopt;
+    }
+
     Channel& operator>>(std::optional<T>& get) {
         get = Get();
         return *this;
@@ -116,6 +140,14 @@ public:
         runnable = false;
         cv.notify_all();
     } 
+
+    bool Runnable() const {
+        return runnable;
+    }
+
+    bool Readable() const {
+        return runnable || buffer.size() > 0;
+    }
 
     struct Iterator {
         Channel& channel;
@@ -163,5 +195,50 @@ private:
 
 template <typename T>
 using UChannel = Channel<T, std::list<T>>;
+
+template <typename T, typename F>
+struct Selectable {
+    T& channel;
+    F action;
+
+    template <typename Fs>
+    Selectable(T& channel, Fs&& action) :
+        channel(channel), action(std::forward<Fs>(action))
+    {
+        // Do Nothing
+    }
+};
+
+template <typename T>
+struct case_m {
+    T& channel;
+    
+    case_m(T& channel) : channel(channel) {
+        // Do Nothing
+    }
+
+    template <typename F>
+    Selectable<T, F> operator>>(F&& action) {
+        return Selectable<T, F>(channel, std::forward<F>(action));
+    }
+};
+
+template <typename... T>
+void select(T&&... matches) {
+    auto readable = [](auto&... selectable) {
+        return (selectable.channel.Readable() || ...);
+    };
+
+    auto try_action = [](auto& match) {
+        std::optional<int> opt = match.channel.TryGet();
+        if (opt.has_value()) {
+            match.action(opt.value());
+        }
+    };
+
+    while (readable(matches...)) {
+        (try_action(matches), ...);
+    }
+}
 
 #endif
