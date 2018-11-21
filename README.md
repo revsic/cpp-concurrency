@@ -111,27 +111,31 @@ Channel operation multiplexer
 ```C++
 UChannel<int> chan0;
 UChannel<int> chan1;
-auto fut = std::async(std::launch::async, [&]{
-    for (size_t i = 0; i < 10; ++i) {
-        if (i % 3 != 0) {
-            std::this_thread::sleep_for(1ms);
-            chan0 << i;
-        }
-    }
-    chan0.Close();
-});
 
-fut = std::async(std::launch::async, [&] {
-    for (size_t i = 0; i < 10; ++i) {
-        if (i % 3 == 0) {
-            chan1 << i;
+auto sleep = []{ std::this_thread::sleep_for(1ms); };
+auto launcher = [](auto& chan, auto cond, auto action) {
+    auto tmp = std::async(std::launch::async, [&]{
+        for (int i = 0; i < 10; ++i) {
+            if (cond(i)) action(i);
         }
-    }
-    chan1.Close();
-});
+        chan.Close();
+    });
+};
+
+launcher(chan0, 
+    [](int i) { return i % 3 != 0; },
+    [&](int i) { chan0 << i; });
+
+launcher(chan1,
+    [](int i) { return i % 3 == 0; },
+    [&](int i) { sleep(); chan1 << i; });
 
 select(
-    case_m(chan0) >> [](int n) { std::cout << "chan0 " << n << std::endl; },
-    case_m(chan1) >> [](int n) { std::cout << "chan1 " << n << std::endl; }
+    case_m(chan0) >> [](int n) { 
+        std::cout << "chan0 " << n << std::endl; 
+    },
+    case_m(chan1) >> [](int n) { 
+        std::cout << "chan1 " << n << std::endl; 
+    }
 );
 ```
