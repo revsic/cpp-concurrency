@@ -104,3 +104,34 @@ wg.Wait();
 auto end = std::chrono::steady_clock::now();
 std::cout << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() << std::endl;
 ```
+
+## Select
+
+Channel operation multiplexer
+```C++
+UChannel<int> chan0;
+UChannel<int> chan1;
+auto fut = std::async(std::launch::async, [&]{
+    for (size_t i = 0; i < 10; ++i) {
+        if (i % 3 != 0) {
+            std::this_thread::sleep_for(1ms);
+            chan0 << i;
+        }
+    }
+    chan0.Close();
+});
+
+fut = std::async(std::launch::async, [&] {
+    for (size_t i = 0; i < 10; ++i) {
+        if (i % 3 == 0) {
+            chan1 << i;
+        }
+    }
+    chan1.Close();
+});
+
+select(
+    case_m(chan0) >> [](int n) { std::cout << "chan0 " << n << std::endl; },
+    case_m(chan1) >> [](int n) { std::cout << "chan1 " << n << std::endl; }
+);
+```
