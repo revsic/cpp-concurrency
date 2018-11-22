@@ -136,6 +136,9 @@ select(
     },
     case_m(chan1) >> [](int n) { 
         std::cout << "chan1 " << n << std::endl; 
+    },
+    default_m >> []{
+        std::cout << "default" << std::endl;
     }
 );
 ```
