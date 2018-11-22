@@ -11,6 +11,7 @@
 #include <type_traits>
 
 #define CHANNEL_HPP
+#define SELECT_HPP
 #define THREAD_POOL_HPP
 #define WAIT_GROUP_HPP
 
@@ -203,6 +204,7 @@ private:
 template <typename T>
 using UChannel = Channel<T, std::list<T>>;
 
+
 template <typename T, typename F>
 struct Selectable {
     T& channel;
@@ -218,7 +220,7 @@ struct Selectable {
 
 struct DefaultSelectable {
     bool Readable() const {
-        return false;
+        return true;
     }
 
     std::optional<void*> TryGet() const {
@@ -228,18 +230,6 @@ struct DefaultSelectable {
     static DefaultSelectable channel;
 };
 DefaultSelectable DefaultSelectable::channel;
-
-struct ControlToken {
-    bool break_flag;
-
-    ControlToken(bool break_flag = false) : break_flag(break_flag) {
-        // Do Nothing
-    }
-
-    void Break() {
-        break_flag = true;
-    }
-};
 
 template <typename T>
 struct case_m {
@@ -257,43 +247,36 @@ struct case_m {
 
 inline case_m default_m(DefaultSelectable::channel);
 
+template <typename A, typename V>
+auto select_invoke(A&& action, V&& value) {
+    if constexpr (std::is_invocable_v<A, V>) {
+        return action(value);
+    }
+    else if constexpr (std::is_invocable_v<A>) {
+        return action();
+    }
+    return;
+}
+
 template <typename... T>
 void select(T&&... matches) {
     auto readable = [](auto&... selectable) {
         return (selectable.channel.Readable() || ...);
     };
 
-    ControlToken token;
-    auto invoke = [&](auto& action, auto& value) {
-        using F = decltype(action);
-        using V = decltype(value);
-
-        if constexpr (std::is_invocable_v<F, ControlToken&, V>) {
-            return action(token, value);
-        }
-        else if constexpr (std::is_invocable_v<F, V>) {
-            return action(value);
-        }
-        else if constexpr (std::is_invocable_v<F, ControlToken&>) {
-            return action(token);
-        }
-        else if constexpr (std::is_invocable_v<F>) {
-            return action();
-        }
-    };
-
+    bool run = true;;
     auto try_action = [&](auto& match) {
-        if (!token.break_flag) {
+        if (run) {
             auto opt = match.channel.TryGet();
             if (opt.has_value()) {
-                invoke(match.action, opt.value());
+                run = false;
+                select_invoke(match.action, opt.value());
             }
         }
     };
 
-    while (!token.break_flag && readable(matches...)) {
-        (try_action(matches), ...);
-    }
+    while (!readable(matches...));
+    (try_action(matches), ...);
 }
 
 
