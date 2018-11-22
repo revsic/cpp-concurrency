@@ -222,6 +222,18 @@ struct DefaultSelectable {
 };
 DefaultSelectable DefaultSelectable::channel;
 
+struct ControlToken {
+    bool break_flag;
+
+    ControlToken(bool break_flag = false) : break_flag(break_flag) {
+        // Do Nothing
+    }
+
+    void Break() {
+        break_flag = true;
+    }
+};
+
 template <typename T>
 struct case_m {
     T& channel;
@@ -238,30 +250,41 @@ struct case_m {
 
 inline case_m default_m(DefaultSelectable::channel);
 
-template <typename F, typename V>
-auto select_invoke(F&& action, V&& value) {
-    if constexpr (std::is_invocable_v<F, V>) {
-        return action(value);
-    }
-    else if constexpr (std::is_invocable_v<F>) {
-        return action();
-    }
-}
-
 template <typename... T>
 void select(T&&... matches) {
     auto readable = [](auto&... selectable) {
         return (selectable.channel.Readable() || ...);
     };
 
-    auto try_action = [](auto& match) {
-        auto opt = match.channel.TryGet();
-        if (opt.has_value()) {
-            select_invoke(match.action, opt.value());
+    ControlToken token;
+    auto invoke = [&](auto& action, auto& value) {
+        using F = decltype(action);
+        using V = decltype(value);
+
+        if constexpr (std::is_invocable_v<F, ControlToken&, V>) {
+            return action(token, value);
+        }
+        else if constexpr (std::is_invocable_v<F, V>) {
+            return action(value);
+        }
+        else if constexpr (std::is_invocable_v<F, ControlToken&>) {
+            return action(token);
+        }
+        else if constexpr (std::is_invocable_v<F>) {
+            return action();
         }
     };
 
-    while (readable(matches...)) {
+    auto try_action = [&](auto& match) {
+        if (!token.break_flag) {
+            auto opt = match.channel.TryGet();
+            if (opt.has_value()) {
+                invoke(match.action, opt.value());
+            }
+        }
+    };
+
+    while (!token.break_flag && readable(matches...)) {
         (try_action(matches), ...);
     }
 }
