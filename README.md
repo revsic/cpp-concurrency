@@ -109,36 +109,29 @@ std::cout << std::chrono::duration_cast<std::chrono::seconds>(end - start).count
 
 Channel operation multiplexer
 ```C++
-UChannel<int> chan0;
-UChannel<int> chan1;
+UChannel<int> tick;
+UChannel<int> boom;
+UThreadPool<void> pool;
 
-auto sleep = []{ std::this_thread::sleep_for(1ms); };
-auto launcher = [](auto& chan, auto cond, auto action) {
-    auto tmp = std::async(std::launch::async, [&]{
-        for (int i = 0; i < 10; ++i) {
-            if (cond(i)) action(i);
+auto sleep = [](auto dur) { std::this_thread::sleep_for(dur); };
+pool.Add([&]{ while(tick.Runnable()) { sleep(100ms); tick << 0; } });
+pool.Add([&]{ sleep(500ms); boom << 0; });
+
+bool cont = true;
+while (cont) {
+    select(
+        case_m(tick) >> [](int) { 
+            std::cout << "tick." << std::endl; 
+        },
+        case_m(boom) >> [&](int) { 
+            std::cout << "boom !" << std::endl;
+            cont = false; 
+        },
+        default_m >> [&]{
+            std::cout << "." << std::endl;
+            sleep(50ms);
         }
-        chan.Close();
-    });
-};
-
-launcher(chan0, 
-    [](int i) { return i % 3 != 0; },
-    [&](int i) { chan0 << i; });
-
-launcher(chan1,
-    [](int i) { return i % 3 == 0; },
-    [&](int i) { sleep(); chan1 << i; });
-
-select(
-    case_m(chan0) >> [](int n) { 
-        std::cout << "chan0 " << n << std::endl; 
-    },
-    case_m(chan1) >> [](int n) { 
-        std::cout << "chan1 " << n << std::endl; 
-    },
-    default_m >> []{
-        std::cout << "default" << std::endl;
-    }
-);
+    );
+}
+tick.Close();
 ```
