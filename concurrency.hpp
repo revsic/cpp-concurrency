@@ -153,7 +153,8 @@ public:
         return runnable;
     }
 
-    bool Readable() const {
+    bool Readable() {
+        std::unique_lock lock(mtx);
         return runnable || buffer.size() > 0;
     }
 
@@ -195,7 +196,7 @@ public:
 
 private:
     Container buffer;
-    bool runnable = true;
+    std::atomic<bool> runnable = true;
 
     std::mutex mtx;
     std::condition_variable cv;
