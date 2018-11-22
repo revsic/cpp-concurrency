@@ -209,6 +209,19 @@ struct Selectable {
     }
 };
 
+struct DefaultSelectable {
+    bool Readable() const {
+        return false;
+    }
+
+    std::optional<void*> TryGet() const {
+        return { nullptr };
+    }
+
+    static DefaultSelectable channel;
+};
+DefaultSelectable DefaultSelectable::channel;
+
 template <typename T>
 struct case_m {
     T& channel;
@@ -223,6 +236,18 @@ struct case_m {
     }
 };
 
+inline case_m default_m(DefaultSelectable::channel);
+
+template <typename F, typename V>
+auto select_invoke(F&& action, V&& value) {
+    if constexpr (std::is_invocable_v<F, V>) {
+        return action(value);
+    }
+    else if constexpr (std::is_invocable_v<F>) {
+        return action();
+    }
+}
+
 template <typename... T>
 void select(T&&... matches) {
     auto readable = [](auto&... selectable) {
@@ -230,9 +255,9 @@ void select(T&&... matches) {
     };
 
     auto try_action = [](auto& match) {
-        std::optional<int> opt = match.channel.TryGet();
+        auto opt = match.channel.TryGet();
         if (opt.has_value()) {
-            match.action(opt.value());
+            select_invoke(match.action, opt.value());
         }
     };
 
