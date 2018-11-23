@@ -120,10 +120,10 @@ pool.Add([&]{ sleep(500ms); boom << 0; });
 bool cont = true;
 while (cont) {
     select(
-        case_m(tick) >> [](int) { 
+        case_m(tick) >> []{ 
             std::cout << "tick." << std::endl; 
         },
-        case_m(boom) >> [&](int) { 
+        case_m(boom) >> [&]{ 
             std::cout << "boom !" << std::endl;
             cont = false; 
         },
