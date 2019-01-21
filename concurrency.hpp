@@ -5,11 +5,13 @@
 #include <condition_variable>
 #include <future>
 #include <list>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <thread>
 #include <type_traits>
 
+#define RING_BUFFER_HPP
 #define CHANNEL_HPP
 #define SELECT_HPP
 #define THREAD_POOL_HPP
@@ -73,6 +75,7 @@ private:
     size_t ptr_head = 0;
     size_t ptr_tail = 0;
 };
+
 
 template <typename T,
           typename Container = RingBuffer<T>> // or Container = std::list<T>
