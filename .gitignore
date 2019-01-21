@@ -1,2 +1,8 @@
+# editor
 .vscode/
+
+# python
 */__pycache__/
+
+# sample code
+sample*
