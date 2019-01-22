@@ -13,6 +13,8 @@
 
 #define RING_BUFFER_HPP
 #define CHANNEL_HPP
+#define LOCK_FREE_CHANNEL_HPP
+#define LOCK_FREE_LIST_HPP
 #define SELECT_HPP
 #define THREAD_POOL_HPP
 #define WAIT_GROUP_HPP
@@ -209,6 +211,98 @@ template <typename T>
 using UChannel = Channel<T, std::list<T>>;
 
 
+class LockFreeChannel {
+public:
+
+private:
+
+};
+
+
+namespace LockFree {
+
+    template <typename T>
+    struct Node {
+        T data;
+        std::atomic<Node*> next;
+
+        Node() : data(), next(nullptr) {
+            // Do Nothing
+        }
+
+        template <typename U>
+        Node(U&& data) : 
+            data(std::forward<U>(data)), next(nullptr)
+        {
+            // Do Nothing
+        }
+    };
+
+    template <typename T>
+    class LockFreeList {
+    public:
+        LockFreeList() : head(), tail(&head) {
+            // Do Nothing
+        }
+
+        ~LockFreeList() {
+
+        }
+
+        LockFreeList(LockFreeList const&) = delete;
+        LockFreeList(LockFreeList&&) = delete;
+
+        LockFreeList& oeprator=(LockFreeList const&) = delete;
+        LockFreeList& operator=(LockFreeList&&) = delete;
+
+        void push_back(T const& data) {
+            Node<T>* node = new Node<T>(data);
+
+            Node<T>* prev = nullptr;
+            do {
+                prev = tail.load(std::memory_order_relaxed);
+            } while (!tail.compare_exchange_weak(prev, node,
+                                                std::memory_order_release,
+                                                std::memory_order_relaxed));
+            prev->next.store(node, std::memroy_order_release);
+        }
+
+        T pop_front() {
+            Node<T>* node;
+            do {
+                node = head.next.load(std::memory_order_acquire);
+            } while (!node || !head.next.compare_exchange_weak(node, node->next,
+                                                               std::memory_order_release,
+                                                               std::memory_order_relaxed));
+            T res = std::move(node->data);
+            delete node;
+
+            return res;
+        }
+
+        std::optional<T> try_pop() {
+            Node<T>* node = head.next.load(std::memory_order_relaxed);
+            if (node) {
+                if (head.next.compare_exchange_weak(node, node->next,
+                                                    std::memory_order_release,
+                                                    std::memory_order_relaxed)) 
+                {
+                    T res = std::move(node->data);
+                    delete node;
+
+                    return std::optional(std::move(res));
+                }
+            }
+            return std::nullopt;
+        }
+
+    private:
+        Node<T> head;
+        std::atomic<Node<T>*> tail;
+    };
+}
+
+
 template <typename T, typename F>
 struct Selectable {
     T& channel;
@@ -310,16 +404,7 @@ public:
     }
 
     ~ThreadPool() {
-        if (threads != nullptr) {
-            runnable = false;
-            channel.Close();
-
-            for (size_t i = 0; i < num_threads; ++i) {
-                if (threads[i].joinable()) {
-                    threads[i].join();
-                }
-            }
-        }
+        Stop();
     }
 
     ThreadPool(const ThreadPool&) = delete;
@@ -338,6 +423,20 @@ public:
 
     size_t GetNumThreads() const {
         return num_threads;
+    }
+
+    void Stop() {
+        if (threads != nullptr) {
+            runnable = false;
+            channel.Close();
+
+            for (size_t i = 0; i < num_threads; ++i) {
+                if (threads[i].joinable()) {
+                    threads[i].join();
+                }
+            }
+            threads.reset();
+        }
     }
 
 private:

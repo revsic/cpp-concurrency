@@ -30,16 +30,7 @@ public:
     }
 
     ~ThreadPool() {
-        if (threads != nullptr) {
-            runnable = false;
-            channel.Close();
-
-            for (size_t i = 0; i < num_threads; ++i) {
-                if (threads[i].joinable()) {
-                    threads[i].join();
-                }
-            }
-        }
+        Stop();
     }
 
     ThreadPool(const ThreadPool&) = delete;
@@ -58,6 +49,20 @@ public:
 
     size_t GetNumThreads() const {
         return num_threads;
+    }
+
+    void Stop() {
+        if (threads != nullptr) {
+            runnable = false;
+            channel.Close();
+
+            for (size_t i = 0; i < num_threads; ++i) {
+                if (threads[i].joinable()) {
+                    threads[i].join();
+                }
+            }
+            threads.reset();
+        }
     }
 
 private:
