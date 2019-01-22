@@ -48,4 +48,6 @@ int main() {
     }
     tick->Close();
     global_pool.Stop();
+
+    return 0;
 }
