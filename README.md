@@ -20,13 +20,16 @@ WaitGroup wg;
 
 ## Sample
 
+Send tick and bomb
+```
+g++ -o tick ./sample/tick.cpp -std=c++17  #linux
+cl /EHsc /std:c++17 ./sample/tick.cpp     #windows
+```
+
 Calculate directory size concurrently.
 ```
-cd sample && mkdir build;
-pushd build;
-cmake .. && make;
-./concurrency_example $YOUR_DIRECTORY
-popd
+g++ -o dir_size ./sample/dir_size.cpp -std=c++17 -lstdc++fs
+cl /EHsc /std:c++17 ./sample/dir_size.cpp
 ```
 
 ## Channel
@@ -70,7 +73,7 @@ std::cout << std::endl;
 ## Thread Pool
 
 - ThreadPool<T> : finite task thread pool, if capacity exhausted, block new and wait for existing tasks to be terminated.
-- UThreadPool<T> : thread pool implemented by task lists.
+- UThreadPool<T> : list based thread pool.
 
 Add new tasks and get return value from future.
 ```C++
@@ -102,28 +105,24 @@ auto fut = std::async(std::launch::async, [&]{
 auto start = std::chrono::steady_clock::now();
 wg.Wait();
 auto end = std::chrono::steady_clock::now();
-std::cout << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() << std::endl;
+
+std::cout << std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
 ```
 
 ## Select
 
-Channel operation multiplexer
+Channel operation multiplexer, samples from [tick.cpp](./sample/tick.cpp)
 ```C++
-UChannel<int> tick;
-UChannel<int> boom;
-UThreadPool<void> pool;
-
-auto sleep = [](auto dur) { std::this_thread::sleep_for(dur); };
-pool.Add([&]{ while(tick.Runnable()) { sleep(100ms); tick << 0; } });
-pool.Add([&]{ sleep(500ms); boom << 0; });
+auto tick = Tick(100ms);
+auto boom = After(500ms);
 
 bool cont = true;
 while (cont) {
     select(
-        case_m(tick) >> []{ 
+        case_m(*tick) >> []{ 
             std::cout << "tick." << std::endl; 
         },
-        case_m(boom) >> [&]{ 
+        case_m(*boom) >> [&]{ 
             std::cout << "boom !" << std::endl;
             cont = false; 
         },
@@ -133,5 +132,5 @@ while (cont) {
         }
     );
 }
-tick.Close();
+tick->Close();
 ```
