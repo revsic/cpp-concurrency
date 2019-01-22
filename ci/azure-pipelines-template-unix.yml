@@ -9,7 +9,7 @@ jobs:
   - task: CMake@1
     inputs:
       workingDirectory: build
-      cmakeArgs: ./test
+      cmakeArgs: ../test
     displayName: CMake catch_test
 
   - script: cd ./build && make;
