@@ -10,10 +10,10 @@ jobs:
     inputs:
       workingDirectory: build
       cmakeArgs: ./test
-    displayName: CMake test
+    displayName: CMake catch_test
 
   - script: cd ./build && make;
-    displayName: GNU Make test
+    displayName: GNU Make catch_test
 
   - script: ./build/catch_test
     displayName: run catch_test
