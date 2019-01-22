@@ -7,7 +7,7 @@
 namespace fs = std::filesystem;
 namespace chrono = std::chrono;
 
-ull sizeof_dir(const fs::path& path) {
+ull sizeof_dir(fs::path const& path) {
     if (fs::is_regular_file(path)) {
         return fs::file_size(path);
     }
@@ -22,7 +22,7 @@ ull sizeof_dir(const fs::path& path) {
     return size;
 }
 
-ull par_sizeof_dir(const fs::path& path) {
+ull par_sizeof_dir(fs::path const& path) {
     WaitGroup wg = 1;
     UChannel<ull> channel;
     UThreadPool<void> pool;
@@ -81,14 +81,9 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    auto list = { sizeof_dir, par_sizeof_dir };
-    auto log = [](auto&& tup){
-        auto[res, dur] = std::move(tup);
+    for (auto const& f : { sizeof_dir, par_sizeof_dir }) {
+        auto[res, dur] = perf<chrono::nanoseconds>(f, path);
         std::cout << "size: " << res << " / time: " << dur.count() << "ns\n";
-    };
-
-    for (auto const& f : list) {
-        log(perf<chrono::nanoseconds>(f, path));
     }
 
     return 0;
