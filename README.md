@@ -22,13 +22,13 @@ WaitGroup wg;
 
 Send tick and bomb
 ```
-g++ -o tick ./sample/tick.cpp -std=c++17  #linux
-cl /EHsc /std:c++17 ./sample/tick.cpp     #windows
+g++ -o tick ./sample/tick.cpp -std=c++17 -lpthread #linux
+cl /EHsc /std:c++17 ./sample/tick.cpp              #windows
 ```
 
 Calculate directory size concurrently.
 ```
-g++ -o dir_size ./sample/dir_size.cpp -std=c++17 -lstdc++fs
+g++ -o dir_size ./sample/dir_size.cpp -std=c++17 -lstdc++fs -lpthread
 cl /EHsc /std:c++17 ./sample/dir_size.cpp
 ```
 
