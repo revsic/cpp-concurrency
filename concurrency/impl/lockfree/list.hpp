@@ -38,7 +38,7 @@ namespace LockFree {
         LockFreeList(LockFreeList const&) = delete;
         LockFreeList(LockFreeList&&) = delete;
 
-        LockFreeList& oeprator=(LockFreeList const&) = delete;
+        LockFreeList& operator=(LockFreeList const&) = delete;
         LockFreeList& operator=(LockFreeList&&) = delete;
 
         void push_back(T const& data) {
@@ -50,7 +50,7 @@ namespace LockFree {
             } while (!tail.compare_exchange_weak(prev, node,
                                                 std::memory_order_release,
                                                 std::memory_order_relaxed));
-            prev->next.store(node, std::memroy_order_release);
+            prev->next.store(node, std::memory_order_release);
         }
 
         T pop_front() {
