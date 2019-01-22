@@ -47,4 +47,5 @@ int main() {
         );
     }
     tick->Close();
+    global_pool.Stop();
 }
