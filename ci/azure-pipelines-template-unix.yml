@@ -1,0 +1,19 @@
+jobs:
+- job: ${{ parameters.name }}
+  pool:
+    vmImage: ${{ parameters.vmImage }}
+  steps:
+  - script: git submodule update --init
+    displayName: initialize submodule
+
+  - task: CMake@1
+    inputs:
+      workingDirectory: build
+      cmakeArgs: ./test
+    displayName: CMake test
+
+  - script: cd ./build && make;
+    displayName: GNU Make test
+
+  - script: ./build/catch_test
+    displayName: run catch_test
