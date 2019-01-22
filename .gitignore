@@ -4,8 +4,7 @@
 # python
 */__pycache__/
 
-# sample code
-sample*
-
 # build files
 build
+*.exe
+*.obj
