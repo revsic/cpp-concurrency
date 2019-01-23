@@ -4,4 +4,4 @@ jobs:
     vmImage: ${{ parameters.vmImage }}
   steps:
   - script: docker build - script/Dockerfile.bionic
-  - displayName: run docker-bionic
+    displayName: run docker-bionic
