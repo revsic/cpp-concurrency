@@ -33,7 +33,12 @@ namespace LockFree {
         }
 
         ~LockFreeList() {
-
+            Node<T>* data = head->next;
+            while (data != nullptr) {
+                Node<T>* next = data->next;
+                delete data;
+                data = next;
+            }
         }
 
         LockFreeList(LockFreeList const&) = delete;
@@ -69,16 +74,14 @@ namespace LockFree {
 
         platform::optional<T> try_pop() {
             Node<T>* node = head.next.load(std::memory_order_relaxed);
-            if (node) {
-                if (head.next.compare_exchange_weak(node, node->next,
-                                                    std::memory_order_release,
-                                                    std::memory_order_relaxed)) 
-                {
-                    T res = std::move(node->data);
-                    delete node;
+            if (node && head.next.compare_exchange_weak(node, node->next,
+                                                        std::memory_order_release,
+                                                        std::memory_order_relaxed))
+            {
+                T res = std::move(node->data);
+                delete node;
 
-                    return platform::optional<T>(std::move(res));
-                }
+                return platform::optional<T>(std::move(res));
             }
             return platform::nullopt;
         }
