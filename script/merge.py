@@ -104,13 +104,16 @@ class SourceInfo(object):
         return SourceInfo.set_with(out, deps, includes, defines)
 
 
-def file_list(dirname):
+def file_list(dirname, ban_dir=[]):
     files = []
+    if isinstance(ban_dir, str):
+        ban_dir = [ban_dir]
+
     for name in os.listdir(dirname):
         full_path = os.path.join(dirname, name)
         if os.path.isfile(full_path):
             files.append(full_path)
-        elif os.path.isdir(full_path):
+        elif os.path.isdir(full_path) and name not in ban_dir:
             files += file_list(full_path)
     return files
 
@@ -127,19 +130,47 @@ def order_dep(deps, files, done):
     for dep in deps:
         if in_endswith(dep, done) is None:
             path = in_endswith(dep, files)
-            new = SourceInfo.read_file(path)
-            dep_new = order_dep(new.deps, files, done)
 
-            info += dep_new + new
-            done.append(path)
+            if path is not None:
+                new = SourceInfo.read_file(path)
+                dep_new = order_dep(new.deps, files, done)
+
+                info += dep_new + new
+                done.append(path)
 
     return info
+
+
+def none_preproc(dirname):
+    if not os.path.exists(dirname):
+        return [], ''
+    
+    dep = []
+    out = ''
+    for files in os.listdir(dirname):
+        with open(os.path.join(dirname, files)) as f:
+            lines = f.readlines()
+        
+        if lines[0].startswith('#ifndef') \
+            and lines[1].startswith('#define') \
+            and lines[-1].startswith('#endif'):
+            lines = lines[2:-1]
+        
+        data = '\n'.join(lines)
+        
+        dep.append(files)
+        out += data
+
+    return dep, out
 
 
 def merge(dirname):
     done = []
     info = SourceInfo()
-    files = file_list(dirname)
+    files = file_list(dirname, 'platform')
+
+    preproc_dep, info.out = \
+        none_preproc(os.path.join(dirname, 'platform'))
 
     for full_path in files:
         if full_path not in done:
@@ -149,18 +180,22 @@ def merge(dirname):
             info += dep + source
             done.append(full_path)
 
-    return info
+    return info, preproc_dep
 
 
-def write_hpp(outfile, info):
+def write_hpp(outfile, merged):
+    info, preproc_dep = merged
+    dep_check = lambda file: not any(file.endswith(dep) for dep in preproc_dep)
+
     idx = outfile.rfind('/')
     if idx > -1:
         outfile = outfile[idx+1:]
     guard_name = outfile.upper().replace('.', '_')
 
     unique_include = []
+
     for include in info.includes:
-        if include not in unique_include:
+        if include not in unique_include and dep_check(include):
             unique_include.append(include)
 
     includes = '\n'.join(
