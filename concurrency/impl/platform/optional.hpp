@@ -1,11 +1,13 @@
 #ifndef PLATFORM_OPTIONAL_HPP
 #define PLATFORM_OPTIONAL_HPP
 
+//merge:include
 #ifndef __APPLE__
 #include <optional>
 #else
 #include <experimental/optional>
 #endif
+//merge:end
 
 namespace platform {
 #ifndef __APPLE__
