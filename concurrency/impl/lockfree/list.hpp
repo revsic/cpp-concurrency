@@ -77,7 +77,7 @@ namespace LockFree {
                     T res = std::move(node->data);
                     delete node;
 
-                    return platform::optional(std::move(res));
+                    return platform::optional<T>(std::move(res));
                 }
             }
             return platform::nullopt;
