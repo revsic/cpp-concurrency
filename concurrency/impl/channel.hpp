@@ -2,11 +2,11 @@
 #define CHANNEL_HPP
 
 #include "ring_buffer.hpp"
+#include "platform/optional.hpp"
 
 #include <condition_variable>
 #include <list>
 #include <mutex>
-#include <optional>
 #include <thread>
 
 template <typename T,
@@ -41,38 +41,38 @@ public:
         return *this;
     }
 
-    std::optional<T> Get() {
+    platform::optional<T> Get() {
         std::unique_lock lock(mtx);
         cv.wait(lock, [&]{ return !runnable || buffer.size() > 0; });
 
-        if (!runnable && buffer.size() == 0) return std::nullopt;
+        if (!runnable && buffer.size() == 0) return platform::nullopt;
 
         T given = std::move(buffer.front());
         buffer.pop_front();
 
         cv.notify_all();
-        return std::optional<T>(std::move(given));
+        return platform::optional<T>(std::move(given));
     }
 
-    std::optional<T> TryGet() {
+    platform::optional<T> TryGet() {
         std::unique_lock lock(mtx, std::try_to_lock);
         if (lock.owns_lock() && buffer.size() > 0) {
             T given = std::move(buffer.front());
             buffer.pop_front();
 
             cv.notify_all();
-            return std::optional<T>(std::move(given));
+            return platform::optional<T>(std::move(given));
         }
-        return std::nullopt;
+        return platform::nullopt;
     }
 
-    Channel& operator>>(std::optional<T>& get) {
+    Channel& operator>>(platform::optional<T>& get) {
         get = Get();
         return *this;
     }
 
     Channel& operator>>(T& get) {
-        std::optional<T> res = Get();
+        platform::optional<T> res = Get();
         if (res.has_value()) {
             get = std::move(res.value());
         }
@@ -95,9 +95,9 @@ public:
 
     struct Iterator {
         Channel& channel;
-        std::optional<T> item;
+        platform::optional<T> item;
 
-        Iterator(Channel& channel, std::optional<T>&& item) : 
+        Iterator(Channel& channel, platform::optional<T>&& item) : 
             channel(channel), item(std::move(item)) 
         {
             // Do Nothing
@@ -126,7 +126,7 @@ public:
     }
 
     Iterator end() {
-        return Iterator(*this, std::nullopt);
+        return Iterator(*this, platform::nullopt);
     }
 
 private:
