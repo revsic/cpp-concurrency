@@ -1,9 +1,10 @@
 #ifndef LOCK_FREE_LIST_HPP
 #define LOCK_FREE_LIST_HPP
 
+#include "../platform/optional.hpp"
+
 #include <atomic>
 #include <memory>
-#include <optional>
 
 namespace LockFree {
 
@@ -66,7 +67,7 @@ namespace LockFree {
             return res;
         }
 
-        std::optional<T> try_pop() {
+        platform::optional<T> try_pop() {
             Node<T>* node = head.next.load(std::memory_order_relaxed);
             if (node) {
                 if (head.next.compare_exchange_weak(node, node->next,
@@ -76,10 +77,10 @@ namespace LockFree {
                     T res = std::move(node->data);
                     delete node;
 
-                    return std::optional(std::move(res));
+                    return platform::optional(std::move(res));
                 }
             }
-            return std::nullopt;
+            return platform::nullopt;
         }
 
     private:
