@@ -47,7 +47,7 @@ namespace platform {
         }
 
         template <typename U>
-        optional(optional<U>&&) : super(std::move(other)) {
+        optional(optional<U>&& other) : super(std::move(other)) {
             // Do Noting
         }
 
