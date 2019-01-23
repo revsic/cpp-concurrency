@@ -1,0 +1,10 @@
+FROM ubuntu:18.04
+
+RUN apt-get update -yq && apt-get install -yq cmake
+
+ADD . /app
+WORKDIR /app/test/build
+
+RUN cmake .. && \
+    make -j `nproc` && \
+    ./catch_test
