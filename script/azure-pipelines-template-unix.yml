@@ -2,5 +2,5 @@ jobs:
 - job: ${{ parameters.name }}
   pool:
     vmImage: ${{ parameters.vmImage }}
-#  steps:
-#  - script: docker build - script/Dockerfile.bionic
+ steps:
+ - script: docker build - script/Dockerfile.bionic
