@@ -1,6 +1,6 @@
 FROM ubuntu:18.04
 
-RUN apt-get update -yq && apt-get install -yq cmake
+RUN apt-get update -yq && apt-get install -yq build-essential cmake
 RUN echo `g++ --version`
 
 ADD . /app
