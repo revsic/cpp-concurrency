@@ -147,6 +147,7 @@ def none_preproc(dirname):
     
     dep = []
     out = ''
+    includes = ''
     for files in os.listdir(dirname):
         with open(os.path.join(dirname, files)) as f:
             lines = f.readlines()
@@ -156,12 +157,20 @@ def none_preproc(dirname):
             and lines[-1].startswith('#endif'):
             lines = lines[2:-1]
         
-        data = '\n'.join(lines)
-        
+        data = ''.join(lines)
+
+        include_idx = data.find('//merge:include')
+        if include_idx != -1:
+            start_idx = include_idx + len('//merge:include')
+            end_idx = data.find('//merge:end', include_idx)
+            
+            includes += data[start_idx:end_idx]
+            data = data[end_idx + len('//merge:end'):]
+
         dep.append(files)
         out += data
 
-    return dep, out
+    return dep, includes + out
 
 
 def merge(dirname):
