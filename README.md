@@ -1,5 +1,8 @@
 # cpp-concurrency
 
+[![License](https://img.shields.io/badge/Licence-MIT-blue.svg)](https://github.com/revsic/cpp-concurrency/blob/master/LICENSE)
+[![Build Status](https://dev.azure.com/revsic99/cpp-concurrency/_apis/build/status/revsic.cpp-concurrency?branchName=master)](https://dev.azure.com/revsic99/cpp-concurrency/_build/latest?definitionId=2?branchName=master)
+
 C++ implementation of golang style concurrency
 
 ## Usage
