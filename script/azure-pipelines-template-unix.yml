@@ -3,5 +3,5 @@ jobs:
   pool:
     vmImage: ${{ parameters.vmImage }}
   steps:
-  - script: docker build - script/Dockerfile.bionic
+  - script: docker build -f script/Dockerfile.bionic -t cpp_concurrency .
     displayName: run docker-bionic
