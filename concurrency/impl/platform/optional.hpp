@@ -65,7 +65,7 @@ namespace platform {
             // Do Nothing
         }
 
-        template <typename U = super::value_type>
+        template <typename U = typename super::value_type>
         constexpr optional(U&& value) : super(std::forward<U>(value)) {
             // Do Nothing
         }
