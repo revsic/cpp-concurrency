@@ -7,7 +7,6 @@
 #include <list>
 #include <memory>
 #include <mutex>
-#include <optional>
 #include <thread>
 #include <type_traits>
 
@@ -18,6 +17,67 @@
 #define SELECT_HPP
 #define THREAD_POOL_HPP
 #define WAIT_GROUP_HPP
+
+
+#ifndef __APPLE__
+
+#include <optional>
+
+#else
+
+#include <experimental/optional>
+
+#endif
+
+
+namespace platform {
+
+#ifndef __APPLE__
+
+    constexpr auto nullopt = std::nullopt;
+
+
+    template <typename T>
+
+    using optional = std::optional<T>;
+
+
+#else
+
+    constexpr auto nullopt = std::experimental::nullopt;
+
+
+    template <typename T>
+
+    class optional : public std::experimental::optional<T> {
+
+    public:
+
+        constexpr T& value() & {
+
+            return **this;
+
+        }
+
+
+        constexpr T&& value() && {
+
+            return std::move(**this);
+
+        }
+
+
+        constexpr bool has_value() const noexcept {
+
+            return static_cast<bool>(*this);
+
+        }
+
+    };
+
+#endif
+
+}
 
 
 template <typename T,
@@ -111,38 +171,38 @@ public:
         return *this;
     }
 
-    std::optional<T> Get() {
+    platform::optional<T> Get() {
         std::unique_lock lock(mtx);
         cv.wait(lock, [&]{ return !runnable || buffer.size() > 0; });
 
-        if (!runnable && buffer.size() == 0) return std::nullopt;
+        if (!runnable && buffer.size() == 0) return platform::nullopt;
 
         T given = std::move(buffer.front());
         buffer.pop_front();
 
         cv.notify_all();
-        return std::optional<T>(std::move(given));
+        return platform::optional<T>(std::move(given));
     }
 
-    std::optional<T> TryGet() {
+    platform::optional<T> TryGet() {
         std::unique_lock lock(mtx, std::try_to_lock);
         if (lock.owns_lock() && buffer.size() > 0) {
             T given = std::move(buffer.front());
             buffer.pop_front();
 
             cv.notify_all();
-            return std::optional<T>(std::move(given));
+            return platform::optional<T>(std::move(given));
         }
-        return std::nullopt;
+        return platform::nullopt;
     }
 
-    Channel& operator>>(std::optional<T>& get) {
+    Channel& operator>>(platform::optional<T>& get) {
         get = Get();
         return *this;
     }
 
     Channel& operator>>(T& get) {
-        std::optional<T> res = Get();
+        platform::optional<T> res = Get();
         if (res.has_value()) {
             get = std::move(res.value());
         }
@@ -165,9 +225,9 @@ public:
 
     struct Iterator {
         Channel& channel;
-        std::optional<T> item;
+        platform::optional<T> item;
 
-        Iterator(Channel& channel, std::optional<T>&& item) : 
+        Iterator(Channel& channel, platform::optional<T>&& item) : 
             channel(channel), item(std::move(item)) 
         {
             // Do Nothing
@@ -196,7 +256,7 @@ public:
     }
 
     Iterator end() {
-        return Iterator(*this, std::nullopt);
+        return Iterator(*this, platform::nullopt);
     }
 
 private:
@@ -280,7 +340,7 @@ namespace LockFree {
             return res;
         }
 
-        std::optional<T> try_pop() {
+        platform::optional<T> try_pop() {
             Node<T>* node = head.next.load(std::memory_order_relaxed);
             if (node) {
                 if (head.next.compare_exchange_weak(node, node->next,
@@ -290,10 +350,10 @@ namespace LockFree {
                     T res = std::move(node->data);
                     delete node;
 
-                    return std::optional(std::move(res));
+                    return platform::optional(std::move(res));
                 }
             }
-            return std::nullopt;
+            return platform::nullopt;
         }
 
     private:
