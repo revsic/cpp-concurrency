@@ -1,11 +1,11 @@
 #ifndef THREAD_POOL_HPP
 #define THREAD_POOL_HPP
 
-#include "channel.hpp"
 #include <future>
 
-template <typename T,
-          typename Container = RingBuffer<std::packaged_task<T()>>>
+#include "channel.hpp"
+
+template <typename T, typename Container = RingBuffer<std::packaged_task<T()>>>
 class ThreadPool {
 public:
     ThreadPool() : ThreadPool(std::thread::hardware_concurrency()) {
@@ -13,16 +13,17 @@ public:
     }
 
     template <typename... Args>
-    ThreadPool(size_t num_threads, Args&&... args) :
-        num_threads(num_threads),
-        threads(std::make_unique<std::thread[]>(num_threads)),
-        channel(std::forward<Args>(args)...)
-    {
+    ThreadPool(size_t num_threads, Args&&... args)
+        : num_threads(num_threads),
+          threads(std::make_unique<std::thread[]>(num_threads)),
+          channel(std::forward<Args>(args)...) {
         for (size_t i = 0; i < num_threads; ++i) {
-            threads[i] = std::thread([this]{ 
+            threads[i] = std::thread([this] {
                 while (runnable) {
                     auto given = channel.Get();
-                    if (!given.has_value()) break;
+                    if (!given.has_value()) {
+                        break;
+                    }
                     given.value()();
                 }
             });

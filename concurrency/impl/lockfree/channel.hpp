@@ -3,9 +3,7 @@
 
 class LockFreeChannel {
 public:
-
 private:
-
 };
 
 #endif

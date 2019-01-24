@@ -1,16 +1,16 @@
 #ifndef CHANNEL_HPP
 #define CHANNEL_HPP
 
-#include "ring_buffer.hpp"
-#include "platform/optional.hpp"
-
 #include <condition_variable>
 #include <list>
 #include <mutex>
 #include <thread>
 
+#include "platform/optional.hpp"
+#include "ring_buffer.hpp"
+
 template <typename T,
-          typename Container = RingBuffer<T>> // or Container = std::list<T>
+          typename Container = RingBuffer<T>>  // or Container = std::list<T>
 class Channel {
 public:
     template <typename... U>
@@ -27,7 +27,8 @@ public:
     template <typename... U>
     void Add(U&&... task) {
         std::unique_lock lock(mtx);
-        cv.wait(lock, [&]{ return !runnable || buffer.size() < buffer.max_size(); });
+        cv.wait(lock,
+                [&] { return !runnable || buffer.size() < buffer.max_size(); });
 
         if (runnable) {
             buffer.emplace_back(std::forward<U>(task)...);
@@ -43,9 +44,11 @@ public:
 
     platform::optional<T> Get() {
         std::unique_lock lock(mtx);
-        cv.wait(lock, [&]{ return !runnable || buffer.size() > 0; });
+        cv.wait(lock, [&] { return !runnable || buffer.size() > 0; });
 
-        if (!runnable && buffer.size() == 0) return platform::nullopt;
+        if (!runnable && buffer.size() == 0) {
+            return platform::nullopt;
+        }
 
         T given = std::move(buffer.front());
         buffer.pop_front();
@@ -82,7 +85,7 @@ public:
     void Close() {
         runnable = false;
         cv.notify_all();
-    } 
+    }
 
     bool Runnable() const {
         return runnable;
@@ -97,9 +100,8 @@ public:
         Channel& channel;
         platform::optional<T> item;
 
-        Iterator(Channel& channel, platform::optional<T>&& item) : 
-            channel(channel), item(std::move(item)) 
-        {
+        Iterator(Channel& channel, platform::optional<T>&& item)
+            : channel(channel), item(std::move(item)) {
             // Do Nothing
         }
 

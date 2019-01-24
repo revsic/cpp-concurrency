@@ -1,13 +1,13 @@
 #ifndef PLATFORM_OPTIONAL_HPP
 #define PLATFORM_OPTIONAL_HPP
 
-//merge:include
+// merge:include
 #ifndef __APPLE__
 #include <optional>
 #else
 #include <experimental/optional>
 #endif
-//merge:end
+// merge:end
 
 namespace platform {
 #ifndef __APPLE__
@@ -24,6 +24,7 @@ namespace platform {
     class optional : public std::experimental::optional<T> {
     private:
         using super = std::experimental::optional<T>;
+
     public:
         constexpr optional() noexcept : super() {
             // Do Nothing
@@ -37,7 +38,8 @@ namespace platform {
             // Do Nothing
         }
 
-        constexpr optional(optional&& other) noexcept : super(std::move(other)) {
+        constexpr optional(optional&& other) noexcept
+            : super(std::move(other)) {
             // Do Nothing
         }
 
@@ -52,16 +54,18 @@ namespace platform {
         }
 
         template <typename... Args>
-        constexpr explicit optional(std::in_place_t, Args&&... args) :
-            super(std::in_place, std::forward<Args>(args)...)
-        {
+        constexpr explicit optional(std::in_place_t, Args&&... args)
+            : super(std::in_place, std::forward<Args>(args)...) {
             // Do Nothing
         }
 
         template <typename U, typename... Args>
-        constexpr explicit optional(std::in_place_t, std::initializer_list<U> ilist, Args&&... args) :
-            super(std::in_place, std::move(ilist), std::forward<Args>(args)...)
-        {
+        constexpr explicit optional(std::in_place_t,
+                                    std::initializer_list<U> ilist,
+                                    Args&&... args)
+            : super(std::in_place,
+                    std::move(ilist),
+                    std::forward<Args>(args)...) {
             // Do Nothing
         }
 
@@ -139,7 +143,7 @@ namespace platform {
             return **this;
         }
 
-        constexpr T const& value() const & {
+        constexpr T const& value() const& {
             return **this;
         }
 
@@ -147,11 +151,11 @@ namespace platform {
             return std::move(**this);
         }
 
-        constexpr T const&& value() const && {
+        constexpr T const&& value() const&& {
             return std::move(**this);
         }
     };
 #endif
-}
+}  // namespace platform
 
 #endif

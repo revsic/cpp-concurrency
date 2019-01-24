@@ -12,9 +12,8 @@ public:
         // Do Nothing
     }
 
-    RingBuffer(size_t size_buffer) :
-        size_buffer(size_buffer), buffer(std::make_unique<T[]>(size_buffer))
-    {
+    RingBuffer(size_t size_buffer)
+        : size_buffer(size_buffer), buffer(std::make_unique<T[]>(size_buffer)) {
         // Do Nothing
     }
 

@@ -9,9 +9,8 @@ struct Selectable {
     F action;
 
     template <typename Fs>
-    Selectable(T& channel, Fs&& action) :
-        channel(channel), action(std::forward<Fs>(action))
-    {
+    Selectable(T& channel, Fs&& action)
+        : channel(channel), action(std::forward<Fs>(action)) {
         // Do Nothing
     }
 };
@@ -32,7 +31,7 @@ DefaultSelectable DefaultSelectable::channel;
 template <typename T>
 struct case_m {
     T& channel;
-    
+
     case_m(T& channel) : channel(channel) {
         // Do Nothing
     }
@@ -62,7 +61,7 @@ void select(T&&... matches) {
         return (selectable.channel.Readable() || ...);
     };
 
-    bool run = true;;
+    bool run = true;
     auto try_action = [&](auto& match) {
         if (run) {
             auto opt = match.channel.TryGet();
@@ -73,7 +72,8 @@ void select(T&&... matches) {
         }
     };
 
-    while (!readable(matches...));
+    while (!readable(matches...))
+        ;
     (try_action(matches), ...);
 }
 
