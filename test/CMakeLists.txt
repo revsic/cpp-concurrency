@@ -15,6 +15,6 @@ add_subdirectory(../external/Catch2 external)
 target_link_libraries(catch_test Catch2::Catch2)
 
 if(UNIX)
-    find_package(Threads REQUIRE)
+    find_package(Threads REQUIRED)
     target_link_libraries(catch_test Threads::Threads)
 endif(UNIX)
