@@ -2,6 +2,7 @@
 #define LOCK_FREE_LIST_HPP
 
 #include <atomic>
+#include <chrono>
 #include <memory>
 
 #include "../platform/optional.hpp"
@@ -24,26 +25,26 @@ namespace LockFree {
     };
 
     template <typename T>
-    class LockFreeList {
+    class List {
     public:
-        LockFreeList() : head(), tail(&head) {
+        List() : head(), tail(&head), num_data(0) {
             // Do Nothing
         }
 
-        ~LockFreeList() {
-            Node<T>* data = head->next;
-            while (data != nullptr) {
-                Node<T>* next = data->next;
-                delete data;
-                data = next;
+        ~List() {
+            Node<T>* node = head.next;
+            while (node != nullptr) {
+                Node<T>* next = node->next;
+                delete node;
+                node = next;
             }
         }
 
-        LockFreeList(LockFreeList const&) = delete;
-        LockFreeList(LockFreeList&&) = delete;
+        List(List const&) = delete;
+        List(List&&) = delete;
 
-        LockFreeList& operator=(LockFreeList const&) = delete;
-        LockFreeList& operator=(LockFreeList&&) = delete;
+        List& operator=(List const&) = delete;
+        List& operator=(List&&) = delete;
 
         void push_back(T const& data) {
             Node<T>* node = new Node<T>(data);
@@ -53,24 +54,29 @@ namespace LockFree {
                 prev = tail.load(std::memory_order_relaxed);
             } while (!tail.compare_exchange_weak(prev,
                                                  node,
-                                                 std::memory_order_release,
+                                                 std::memory_order_relaxed,
                                                  std::memory_order_relaxed));
-            prev->next.store(node, std::memory_order_release);
+            prev->next.store(node, std::memory_order_relaxed);
+            ++num_data;
         }
 
         T pop_front() {
+            using namespace std::literals;
+
             Node<T>* node;
             do {
-                node = head.next.load(std::memory_order_acquire);
+                std::this_thread::sleep_for(5us);
+                node = head.next.load(std::memory_order_relaxed);
             } while (
                 !node
                 || !head.next.compare_exchange_weak(node,
                                                     node->next,
-                                                    std::memory_order_release,
+                                                    std::memory_order_relaxed,
                                                     std::memory_order_relaxed));
+            --num_data;
             T res = std::move(node->data);
-            delete node;
 
+            delete node;
             return res;
         }
 
@@ -79,19 +85,30 @@ namespace LockFree {
             if (node
                 && head.next.compare_exchange_weak(node,
                                                    node->next,
-                                                   std::memory_order_release,
+                                                   std::memory_order_relaxed,
                                                    std::memory_order_relaxed)) {
+                --num_data;
                 T res = std::move(node->data);
-                delete node;
 
+                delete node;
                 return platform::optional<T>(std::move(res));
             }
             return platform::nullopt;
         }
 
+        size_t size() const {
+            return num_data;
+        }
+
+        Node<T>* node() {
+            return head.next;
+        }
+
     private:
         Node<T> head;
         std::atomic<Node<T>*> tail;
+
+        std::atomic<size_t> num_data;
     };
 }  // namespace LockFree
 
