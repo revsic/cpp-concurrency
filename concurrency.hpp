@@ -41,6 +41,7 @@ namespace platform {
     class optional : public std::experimental::optional<T> {
     private:
         using super = std::experimental::optional<T>;
+
     public:
         constexpr optional() noexcept : super() {
             // Do Nothing
@@ -54,7 +55,8 @@ namespace platform {
             // Do Nothing
         }
 
-        constexpr optional(optional&& other) noexcept : super(std::move(other)) {
+        constexpr optional(optional&& other) noexcept
+            : super(std::move(other)) {
             // Do Nothing
         }
 
@@ -69,16 +71,18 @@ namespace platform {
         }
 
         template <typename... Args>
-        constexpr explicit optional(std::in_place_t, Args&&... args) :
-            super(std::in_place, std::forward<Args>(args)...)
-        {
+        constexpr explicit optional(std::in_place_t, Args&&... args)
+            : super(std::in_place, std::forward<Args>(args)...) {
             // Do Nothing
         }
 
         template <typename U, typename... Args>
-        constexpr explicit optional(std::in_place_t, std::initializer_list<U> ilist, Args&&... args) :
-            super(std::in_place, std::move(ilist), std::forward<Args>(args)...)
-        {
+        constexpr explicit optional(std::in_place_t,
+                                    std::initializer_list<U> ilist,
+                                    Args&&... args)
+            : super(std::in_place,
+                    std::move(ilist),
+                    std::forward<Args>(args)...) {
             // Do Nothing
         }
 
@@ -156,7 +160,7 @@ namespace platform {
             return **this;
         }
 
-        constexpr T const& value() const & {
+        constexpr T const& value() const& {
             return **this;
         }
 
@@ -164,12 +168,12 @@ namespace platform {
             return std::move(**this);
         }
 
-        constexpr T const&& value() const && {
+        constexpr T const&& value() const&& {
             return std::move(**this);
         }
     };
 #endif
-}
+}  // namespace platform
 
 
 template <typename T,
@@ -180,9 +184,8 @@ public:
         // Do Nothing
     }
 
-    RingBuffer(size_t size_buffer) :
-        size_buffer(size_buffer), buffer(std::make_unique<T[]>(size_buffer))
-    {
+    RingBuffer(size_t size_buffer)
+        : size_buffer(size_buffer), buffer(std::make_unique<T[]>(size_buffer)) {
         // Do Nothing
     }
 
@@ -232,7 +235,7 @@ private:
 
 
 template <typename T,
-          typename Container = RingBuffer<T>> // or Container = std::list<T>
+          typename Container = RingBuffer<T>>  // or Container = std::list<T>
 class Channel {
 public:
     template <typename... U>
@@ -249,7 +252,8 @@ public:
     template <typename... U>
     void Add(U&&... task) {
         std::unique_lock lock(mtx);
-        cv.wait(lock, [&]{ return !runnable || buffer.size() < buffer.max_size(); });
+        cv.wait(lock,
+                [&] { return !runnable || buffer.size() < buffer.max_size(); });
 
         if (runnable) {
             buffer.emplace_back(std::forward<U>(task)...);
@@ -265,9 +269,11 @@ public:
 
     platform::optional<T> Get() {
         std::unique_lock lock(mtx);
-        cv.wait(lock, [&]{ return !runnable || buffer.size() > 0; });
+        cv.wait(lock, [&] { return !runnable || buffer.size() > 0; });
 
-        if (!runnable && buffer.size() == 0) return platform::nullopt;
+        if (!runnable && buffer.size() == 0) {
+            return platform::nullopt;
+        }
 
         T given = std::move(buffer.front());
         buffer.pop_front();
@@ -304,7 +310,7 @@ public:
     void Close() {
         runnable = false;
         cv.notify_all();
-    } 
+    }
 
     bool Runnable() const {
         return runnable;
@@ -319,9 +325,8 @@ public:
         Channel& channel;
         platform::optional<T> item;
 
-        Iterator(Channel& channel, platform::optional<T>&& item) : 
-            channel(channel), item(std::move(item)) 
-        {
+        Iterator(Channel& channel, platform::optional<T>&& item)
+            : channel(channel), item(std::move(item)) {
             // Do Nothing
         }
 
@@ -365,9 +370,7 @@ using UChannel = Channel<T, std::list<T>>;
 
 class LockFreeChannel {
 public:
-
 private:
-
 };
 
 
@@ -383,9 +386,7 @@ namespace LockFree {
         }
 
         template <typename U>
-        Node(U&& data) : 
-            data(std::forward<U>(data)), next(nullptr)
-        {
+        Node(U&& data) : data(std::forward<U>(data)), next(nullptr) {
             // Do Nothing
         }
     };
@@ -398,7 +399,12 @@ namespace LockFree {
         }
 
         ~LockFreeList() {
-
+            Node<T>* data = head->next;
+            while (data != nullptr) {
+                Node<T>* next = data->next;
+                delete data;
+                data = next;
+            }
         }
 
         LockFreeList(LockFreeList const&) = delete;
@@ -413,9 +419,10 @@ namespace LockFree {
             Node<T>* prev = nullptr;
             do {
                 prev = tail.load(std::memory_order_relaxed);
-            } while (!tail.compare_exchange_weak(prev, node,
-                                                std::memory_order_release,
-                                                std::memory_order_relaxed));
+            } while (!tail.compare_exchange_weak(prev,
+                                                 node,
+                                                 std::memory_order_release,
+                                                 std::memory_order_relaxed));
             prev->next.store(node, std::memory_order_release);
         }
 
@@ -423,9 +430,12 @@ namespace LockFree {
             Node<T>* node;
             do {
                 node = head.next.load(std::memory_order_acquire);
-            } while (!node || !head.next.compare_exchange_weak(node, node->next,
-                                                               std::memory_order_release,
-                                                               std::memory_order_relaxed));
+            } while (
+                !node
+                || !head.next.compare_exchange_weak(node,
+                                                    node->next,
+                                                    std::memory_order_release,
+                                                    std::memory_order_relaxed));
             T res = std::move(node->data);
             delete node;
 
@@ -434,16 +444,15 @@ namespace LockFree {
 
         platform::optional<T> try_pop() {
             Node<T>* node = head.next.load(std::memory_order_relaxed);
-            if (node) {
-                if (head.next.compare_exchange_weak(node, node->next,
-                                                    std::memory_order_release,
-                                                    std::memory_order_relaxed)) 
-                {
-                    T res = std::move(node->data);
-                    delete node;
+            if (node
+                && head.next.compare_exchange_weak(node,
+                                                   node->next,
+                                                   std::memory_order_release,
+                                                   std::memory_order_relaxed)) {
+                T res = std::move(node->data);
+                delete node;
 
-                    return platform::optional<T>(std::move(res));
-                }
+                return platform::optional<T>(std::move(res));
             }
             return platform::nullopt;
         }
@@ -452,7 +461,7 @@ namespace LockFree {
         Node<T> head;
         std::atomic<Node<T>*> tail;
     };
-}
+}  // namespace LockFree
 
 
 template <typename T, typename F>
@@ -461,9 +470,8 @@ struct Selectable {
     F action;
 
     template <typename Fs>
-    Selectable(T& channel, Fs&& action) :
-        channel(channel), action(std::forward<Fs>(action))
-    {
+    Selectable(T& channel, Fs&& action)
+        : channel(channel), action(std::forward<Fs>(action)) {
         // Do Nothing
     }
 };
@@ -514,7 +522,7 @@ void select(T&&... matches) {
         return (selectable.channel.Readable() || ...);
     };
 
-    bool run = true;;
+    bool run = true;
     auto try_action = [&](auto& match) {
         if (run) {
             auto opt = match.channel.TryGet();
@@ -525,13 +533,13 @@ void select(T&&... matches) {
         }
     };
 
-    while (!readable(matches...));
+    while (!readable(matches...))
+        ;
     (try_action(matches), ...);
 }
 
 
-template <typename T,
-          typename Container = RingBuffer<std::packaged_task<T()>>>
+template <typename T, typename Container = RingBuffer<std::packaged_task<T()>>>
 class ThreadPool {
 public:
     ThreadPool() : ThreadPool(std::thread::hardware_concurrency()) {
@@ -539,16 +547,17 @@ public:
     }
 
     template <typename... Args>
-    ThreadPool(size_t num_threads, Args&&... args) :
-        num_threads(num_threads),
-        threads(std::make_unique<std::thread[]>(num_threads)),
-        channel(std::forward<Args>(args)...)
-    {
+    ThreadPool(size_t num_threads, Args&&... args)
+        : num_threads(num_threads),
+          threads(std::make_unique<std::thread[]>(num_threads)),
+          channel(std::forward<Args>(args)...) {
         for (size_t i = 0; i < num_threads; ++i) {
-            threads[i] = std::thread([this]{ 
+            threads[i] = std::thread([this] {
                 while (runnable) {
                     auto given = channel.Get();
-                    if (!given.has_value()) break;
+                    if (!given.has_value()) {
+                        break;
+                    }
                     given.value()();
                 }
             });
