@@ -159,13 +159,13 @@ def none_preproc(dirname):
         
         data = ''.join(lines)
 
-        include_idx = data.find('//merge:include')
+        include_idx = data.find('// merge:include')
         if include_idx != -1:
-            start_idx = include_idx + len('//merge:include')
-            end_idx = data.find('//merge:end', include_idx)
+            start_idx = include_idx + len('// merge:include')
+            end_idx = data.find('// merge:end', include_idx)
             
             includes += data[start_idx:end_idx]
-            data = data[end_idx + len('//merge:end'):]
+            data = data[end_idx + len('// merge:end'):]
 
         dep.append(files)
         out += data
