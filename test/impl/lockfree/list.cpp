@@ -1,5 +1,4 @@
 #include <catch2/catch.hpp>
-#include <iostream>
 #include <lockfree/list.hpp>
 #include <thread_pool.hpp>
 
