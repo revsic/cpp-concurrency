@@ -10,7 +10,7 @@ namespace platform {
 #ifndef __APPLE__
     constexpr auto prevent_deadlock = 5us;
 #else
-    constexpr auto prevent_deadlock = 500us;
+    constexpr auto prevent_deadlock = 200us;
 #endif
 }  // namespace platform
 
