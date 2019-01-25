@@ -1,7 +1,7 @@
 #ifndef PLATFORM_OPTIONAL_HPP
 #define PLATFORM_OPTIONAL_HPP
 
-// merge:include
+// merge:np_include
 #ifndef __APPLE__
 #include <optional>
 #else
