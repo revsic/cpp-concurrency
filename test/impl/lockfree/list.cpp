@@ -198,14 +198,19 @@ TEST_CASE("List::runnable, readable, interrupt, resume", "[lockfree/list]") {
     auto res = list.pop_front();
 
     REQUIRE(!list.readable());
-    REQUIRE(list.size() == 1);
-    REQUIRE(res == platform::nullopt);
-
-    list.resume();
-    res = list.pop_front();
-
-    REQUIRE(!list.readable());
     REQUIRE(list.size() == 0);
     REQUIRE(res.has_value());
     REQUIRE(res.value() == -1);
+
+    list.resume();
+    list.push_back(-1);
+    res = list.pop_front();
+
+    REQUIRE(list.readable());
+    REQUIRE(list.size() == 0);
+    REQUIRE(res.has_value());
+    REQUIRE(res.value() == -1);
+
+    list.interrupt();
+    REQUIRE(!list.readable());
 }

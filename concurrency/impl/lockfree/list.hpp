@@ -94,7 +94,7 @@ namespace LockFree {
             do {
                 std::this_thread::sleep_for(prevent_deadlock);
 
-                run = runnable();
+                run = readable();
                 node = m_head.load(std::memory_order_relaxed);
             } while (run
                      && (!node
@@ -118,12 +118,11 @@ namespace LockFree {
 
         platform::optional<T> try_pop() {
             Node<T>* node = m_head.load(std::memory_order_relaxed);
-            if (runnable() && node
-                && m_head.compare_exchange_weak(
-                       node,
-                       node->next,
-                       std::memory_order_relaxed,
-                       std::memory_order_relaxed)) {
+            if (readable() && node
+                && m_head.compare_exchange_weak(node,
+                                                node->next,
+                                                std::memory_order_relaxed,
+                                                std::memory_order_relaxed)) {
                 if (node->next == nullptr) {
                     m_tail.store(nullptr, std::memory_order_relaxed);
                 }
@@ -154,7 +153,7 @@ namespace LockFree {
 
         bool readable() const {
             return runnable()
-                   && m_head.load(std::memory_order_relaxed) != nullptr;
+                   || m_head.load(std::memory_order_relaxed) != nullptr;
         }
 
         void interrupt() {
