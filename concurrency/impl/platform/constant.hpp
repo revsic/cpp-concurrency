@@ -6,12 +6,11 @@
 // merge:end
 
 namespace platform {
-#ifndef __APPLE__
-    constexpr std::chrono::microseconds prevent_deadlock(5);
-#else
-    // constexpr std::chrono::microseconds prevent_deadlock(150);
     using namespace std::literals;
-    constexpr auto prevent_deadlock = 1ms;
+#ifndef __APPLE__
+    constexpr auto prevent_deadlock = 5us;
+#else
+    constexpr auto prevent_deadlock = 500us;
 #endif
 }  // namespace platform
 
