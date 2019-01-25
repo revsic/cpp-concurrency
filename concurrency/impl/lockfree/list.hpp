@@ -34,7 +34,7 @@ namespace LockFree {
         }
 
         ~List() {
-            runnable.store(false, std::memory_order_relaxed);
+            runnable.store(false, std::memory_order_release);
 
             Node<T>* node = head.next;
             while (node != nullptr) {
