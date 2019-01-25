@@ -47,7 +47,7 @@ TEST_CASE("List::pop_front", "[lockfree/list]") {
     UThreadPool<size_t> pool;
     std::vector<std::future<size_t>> futs;
     for (size_t i = 0; i < test_num; ++i) {
-        futs.emplace_back(pool.Add([&] { return list.pop_front(); }));
+        futs.emplace_back(pool.Add([&] { return list.pop_front().value(); }));
     }
 
     size_t acc = 0;
@@ -75,7 +75,8 @@ TEST_CASE("Concurrently push and pop", "[lockfree/list]") {
     std::vector<std::future<size_t>> pop_futs;
     auto pop = pop_pool.Add([&] {
         for (size_t i = 0; i < test_num; ++i) {
-            pop_futs.push_back(pop_pool.Add([&] { return list.pop_front(); }));
+            pop_futs.push_back(
+                pop_pool.Add([&] { return list.pop_front().value(); }));
         }
         return 0;
     });
