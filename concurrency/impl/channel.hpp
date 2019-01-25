@@ -10,7 +10,7 @@
 #include "ring_buffer.hpp"
 
 template <typename T,
-          typename Container = RingBuffer<T>>  // or Container = std::list<T>
+          template<typename> class Container = RingBuffer>  // or Container = std::list
 class Channel {
 public:
     template <typename... U>
@@ -132,7 +132,7 @@ public:
     }
 
 private:
-    Container buffer;
+    Container<T> buffer;
     std::atomic<bool> runnable = true;
 
     std::mutex mtx;
@@ -140,6 +140,6 @@ private:
 };
 
 template <typename T>
-using UChannel = Channel<T, std::list<T>>;
+using UChannel = Channel<T, std::list>;
 
 #endif
