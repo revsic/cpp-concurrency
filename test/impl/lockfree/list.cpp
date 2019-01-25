@@ -25,7 +25,7 @@ TEST_CASE("List::push_back", "[lockfree/list]") {
     REQUIRE(list.size() == test_num);
 
     size_t acc = 0;
-    LockFree::Node<size_t>* node = list.node();
+    LockFree::Node<size_t>* node = list.head();
     while (node != nullptr) {
         acc += node->data;
         node = node->next;
@@ -56,6 +56,7 @@ TEST_CASE("List::pop_front", "[lockfree/list]") {
     }
 
     REQUIRE(acc == test_num * (test_num + 1) / 2);
+    REQUIRE(list.head() == list.tail());
 }
 
 TEST_CASE("Concurrently push and pop", "[lockfree/list]") {
@@ -94,6 +95,7 @@ TEST_CASE("Concurrently push and pop", "[lockfree/list]") {
     }
 
     REQUIRE(acc == test_num * (test_num + 1) / 2);
+    REQUIRE(list.head() == list.tail());
 }
 
 TEST_CASE("List::try_pop", "[lockfree/list]") {
@@ -124,6 +126,7 @@ TEST_CASE("List::try_pop", "[lockfree/list]") {
     }
 
     REQUIRE(acc == test_num * (test_num + 1) / 2);
+    REQUIRE(list.head() == list.tail());
 }
 
 TEST_CASE("Concurrently push and try_pop", "[lockfree/list]") {
@@ -170,4 +173,39 @@ TEST_CASE("Concurrently push and try_pop", "[lockfree/list]") {
     }
 
     REQUIRE(acc == test_num * (test_num + 1) / 2);
+    REQUIRE(list.head() == list.tail());
+}
+
+TEST_CASE("List::runnable, readable, interrupt, resume", "[lockfree/list]") {
+    LockFree::List<int> list;
+    REQUIRE(list.runnable());
+
+    list.interrupt();
+    list.push_back(-1);
+
+    REQUIRE(!list.runnable());
+    REQUIRE(!list.readable());
+    REQUIRE(list.size() == 0);
+
+    list.resume();
+    list.push_back(-1);
+
+    REQUIRE(list.runnable());
+    REQUIRE(list.readable());
+    REQUIRE(list.size() == 1);
+
+    list.interrupt();
+    auto res = list.pop_front();
+
+    REQUIRE(!list.readable());
+    REQUIRE(list.size() == 1);
+    REQUIRE(res == platform::nullopt);
+
+    list.resume();
+    res = list.pop_front();
+
+    REQUIRE(!list.readable());
+    REQUIRE(list.size() == 0);
+    REQUIRE(res.has_value());
+    REQUIRE(res.value() == -1);
 }
