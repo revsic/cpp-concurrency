@@ -11,6 +11,7 @@
 
 namespace platform {
 #ifndef __APPLE__
+    using nullopt_t = std::nullopt_t;
     constexpr auto nullopt = std::nullopt;
 
     template <typename T>
