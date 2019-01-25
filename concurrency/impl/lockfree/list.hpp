@@ -61,12 +61,11 @@ namespace LockFree {
             ++num_data;
         }
 
-        T pop_front() {
-            using namespace std::literals;
-
+        template <typename U = std::chrono::microseconds>
+        T pop_front(U const& prevent_deadlock = platform::prevent_deadlock) {
             Node<T>* node;
             do {
-                std::this_thread::sleep_for(5us);
+                std::this_thread::sleep_for(prevent_deadlock);
                 node = head.next.load(std::memory_order_relaxed);
             } while (
                 !node
