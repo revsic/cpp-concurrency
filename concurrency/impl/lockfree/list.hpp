@@ -20,8 +20,8 @@ namespace LockFree {
             // Do Nothing
         }
 
-        template <typename U>
-        Node(U&& data) : data(std::forward<U>(data)), next(nullptr) {
+        template <typename... U>
+        Node(U&&... data) : data(std::forward<U>(data)...), next(nullptr) {
             // Do Nothing
         }
     };
@@ -51,8 +51,19 @@ namespace LockFree {
         List& operator=(List&&) = delete;
 
         void push_back(T const& data) {
-            Node<T>* node = new Node<T>(data);
+            push_node(new Node<T>(data));
+        }
 
+        void push_back(T&& data) {
+            push_node(new Node<T>(std::move(data)));
+        }
+
+        template <typename... U>
+        void emplace_back(U&&... args) {
+            push_node(new Node<T>(std::forward<U>(args)...));
+        }
+
+        void push_node(Node<T>* node) {
             bool run = false;
             Node<T>* prev = nullptr;
             do {
@@ -124,6 +135,11 @@ namespace LockFree {
 
         bool runnable() const {
             return m_runnable.load(std::memory_order_relaxed);
+        }
+
+        bool readable() const {
+            return runnable()
+                   && m_head.next.load(std::memory_order_relaxed) != nullptr;
         }
 
         void interrupt() {
