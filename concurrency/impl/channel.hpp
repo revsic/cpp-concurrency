@@ -102,11 +102,11 @@ public:
     }
 
     iterator begin() {
-        return ChannelIterator(*this, Get());
+        return iterator(*this, Get());
     }
 
     iterator end() {
-        return ChannelIterator(*this, platform::nullopt);
+        return iterator(*this, platform::nullopt);
     }
 
 private:
