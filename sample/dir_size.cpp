@@ -1,8 +1,8 @@
-#include "../concurrency.hpp"
-
 #include <chrono>
 #include <filesystem>
 #include <iostream>
+
+#include "../concurrency.hpp"
 
 namespace fs = std::filesystem;
 namespace chrono = std::chrono;
@@ -22,9 +22,10 @@ ull sizeof_dir(fs::path const& path) {
     return size;
 }
 
+template <typename Channel>
 ull par_sizeof_dir(fs::path const& path) {
     WaitGroup wg = 1;
-    UChannel<ull> channel;
+    Channel channel;
     UThreadPool<void> pool;
 
     std::function<void(fs::path const&)> par = [&](fs::path const& path) {
@@ -40,7 +41,7 @@ ull par_sizeof_dir(fs::path const& path) {
                 }
                 else if (dir.is_directory()) {
                     wg.Add();
-                    pool.Add([&, path=dir.path()]{ par(path); });
+                    pool.Add([&, path = dir.path()] { par(path); });
                 }
             }
             channel << res;
@@ -67,8 +68,7 @@ auto perf(F&& func, Args&&... args) {
     return std::make_tuple(res, chrono::duration_cast<T>(end - start));
 }
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
     if (argc < 2) {
         std::cout << "Usage: ./concurrency_example [DIR_PATH]" << std::endl;
         return 1;
@@ -81,8 +81,10 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    for (auto const& f : { sizeof_dir, par_sizeof_dir }) {
-        auto[res, dur] = perf<chrono::nanoseconds>(f, path);
+    for (auto const& f : { sizeof_dir,
+                           &par_sizeof_dir<UChannel<ull>>,
+                           &par_sizeof_dir<LockFree::Channel<ull>> }) {
+        auto [res, dur] = perf<chrono::nanoseconds>(f, path);
         std::cout << "size: " << res << " / time: " << dur.count() << "ns\n";
     }
 
