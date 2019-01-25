@@ -22,11 +22,11 @@ ull sizeof_dir(fs::path const& path) {
     return size;
 }
 
-template <typename Channel>
+template <typename ChannelType, typename ThreadPoolType>
 ull par_sizeof_dir(fs::path const& path) {
     WaitGroup wg = 1;
-    Channel channel;
-    UThreadPool<void> pool;
+    ChannelType channel;
+    ThreadPoolType pool;
 
     std::function<void(fs::path const&)> par = [&](fs::path const& path) {
         if (fs::is_regular_file(path)) {
@@ -82,8 +82,10 @@ int main(int argc, char* argv[]) {
     }
 
     for (auto const& f : { sizeof_dir,
-                           &par_sizeof_dir<UChannel<ull>>,
-                           &par_sizeof_dir<LockFree::Channel<ull>> }) {
+                           &par_sizeof_dir<UChannel<ull>, UThreadPool<void>>,
+                           &par_sizeof_dir<UChannel<ull>, LThreadPool<void>>,
+                           &par_sizeof_dir<LockFree::Channel<ull>, UThreadPool<void>>,
+                           &par_sizeof_dir<LockFree::Channel<ull>, LThreadPool<void>> }) {
         auto [res, dur] = perf<chrono::nanoseconds>(f, path);
         std::cout << "size: " << res << " / time: " << dur.count() << "ns\n";
     }
