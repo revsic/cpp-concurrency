@@ -4,10 +4,12 @@
 #include <memory>
 #include <type_traits>
 
-template <typename T,
-          typename = std::enable_if_t<std::is_default_constructible_v<T>>>
+template <typename T>
 class RingBuffer {
 public:
+    static_assert(std::is_default_constructible_v<T>,
+                  "RingBuffer base type must be default constructible");
+
     RingBuffer() : RingBuffer(1) {
         // Do Nothing
     }
