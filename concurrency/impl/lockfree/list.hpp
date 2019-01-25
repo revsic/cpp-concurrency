@@ -34,7 +34,8 @@ namespace LockFree {
         }
 
         ~List() {
-            runnable = false;
+            runnable.store(false, std::memory_order_relaxed);
+
             Node<T>* node = head.next;
             while (node != nullptr) {
                 Node<T>* next = node->next;
@@ -55,7 +56,7 @@ namespace LockFree {
             Node<T>* prev = nullptr;
             do {
                 prev = tail.load(std::memory_order_relaxed);
-            } while (runnable
+            } while (runnable.load(std::memory_order_relaxed)
                      && !tail.compare_exchange_weak(prev,
                                                     node,
                                                     std::memory_order_relaxed,
@@ -70,7 +71,7 @@ namespace LockFree {
             do {
                 std::this_thread::sleep_for(prevent_deadlock);
                 node = head.next.load(std::memory_order_relaxed);
-            } while (runnable
+            } while (runnable.load(std::memory_order_relaxed)
                      && (!node
                          || !head.next.compare_exchange_weak(
                                 node,
@@ -86,7 +87,7 @@ namespace LockFree {
 
         platform::optional<T> try_pop() {
             Node<T>* node = head.next.load(std::memory_order_relaxed);
-            if (runnable && node
+            if (runnable.load(std::memory_order_relaxed) && node
                 && head.next.compare_exchange_weak(node,
                                                    node->next,
                                                    std::memory_order_relaxed,
@@ -112,7 +113,7 @@ namespace LockFree {
         Node<T> head;
         std::atomic<Node<T>*> tail;
 
-        bool runnable;
+        std::atomic<bool> runnable;
         std::atomic<size_t> num_data;
     };
 }  // namespace LockFree
