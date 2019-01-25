@@ -10,10 +10,11 @@
 #include <thread>
 #include <type_traits>
 
+#define CHANNEL_ITER_HPP
 #define RING_BUFFER_HPP
 #define CHANNEL_HPP
-#define LOCK_FREE_CHANNEL_HPP
 #define LOCK_FREE_LIST_HPP
+#define LOCK_FREE_CHANNEL_HPP
 #define SELECT_HPP
 #define THREAD_POOL_HPP
 #define WAIT_GROUP_HPP
@@ -28,16 +29,19 @@
 
 
 namespace platform {
+    using namespace std::literals;
 #ifndef __APPLE__
-    constexpr std::chrono::microseconds prevent_deadlock(5);
+    constexpr auto prevent_deadlock = 5us;
 #else
-    constexpr std::chrono::microseconds prevent_deadlock(150);
+    // constexpr auto prevent_deadlock = 150us;  // for personal mac
+    constexpr auto prevent_deadlock = 500us;  // for azure-pipeline mac
 #endif
 }  // namespace platform
 
 
 namespace platform {
 #ifndef __APPLE__
+    using nullopt_t = std::nullopt_t;
     constexpr auto nullopt = std::nullopt;
 
     template <typename T>
@@ -186,10 +190,43 @@ namespace platform {
 }  // namespace platform
 
 
-template <typename T,
-          typename = std::enable_if_t<std::is_default_constructible_v<T>>>
+template <typename T, typename Channel>
+class ChannelIterator {
+public:
+    ChannelIterator(Channel& channel, platform::optional<T>&& item)
+        : channel(channel), item(std::move(item)) {
+        // Do Nothing
+    }
+
+    T& operator*() {
+        return item.value();
+    }
+
+    const T& operator*() const {
+        return item.value();
+    }
+
+    ChannelIterator& operator++() {
+        item = channel.Get();
+        return *this;
+    }
+
+    bool operator!=(const ChannelIterator& other) const {
+        return item != other.item;
+    }
+
+private:
+    Channel& channel;
+    platform::optional<T> item;
+};
+
+
+template <typename T, typename = void>  // for stl compatiblity
 class RingBuffer {
 public:
+    static_assert(std::is_default_constructible_v<T>,
+                  "RingBuffer base type must be default constructible");
+
     RingBuffer() : RingBuffer(1) {
         // Do Nothing
     }
@@ -245,9 +282,13 @@ private:
 
 
 template <typename T,
-          typename Container = RingBuffer<T>>  // or Container = std::list<T>
+          template <typename Elem, typename = std::allocator<Elem>>
+          class Container = RingBuffer>  // or Container = std::list
 class Channel {
 public:
+    using value_type = T;
+    using iterator = ChannelIterator<T, Channel>;
+
     template <typename... U>
     Channel(U&&... args) : buffer(std::forward<U>(args)...) {
         // Do Nothing
@@ -331,43 +372,16 @@ public:
         return runnable || buffer.size() > 0;
     }
 
-    struct Iterator {
-        Channel& channel;
-        platform::optional<T> item;
-
-        Iterator(Channel& channel, platform::optional<T>&& item)
-            : channel(channel), item(std::move(item)) {
-            // Do Nothing
-        }
-
-        T& operator*() {
-            return item.value();
-        }
-
-        const T& operator*() const {
-            return item.value();
-        }
-
-        Iterator& operator++() {
-            item = channel.Get();
-            return *this;
-        }
-
-        bool operator!=(const Iterator& other) const {
-            return item != other.item;
-        }
-    };
-
-    Iterator begin() {
-        return Iterator(*this, Get());
+    iterator begin() {
+        return iterator(*this, Get());
     }
 
-    Iterator end() {
-        return Iterator(*this, platform::nullopt);
+    iterator end() {
+        return iterator(*this, platform::nullopt);
     }
 
 private:
-    Container buffer;
+    Container<T> buffer;
     std::atomic<bool> runnable = true;
 
     std::mutex mtx;
@@ -375,13 +389,7 @@ private:
 };
 
 template <typename T>
-using UChannel = Channel<T, std::list<T>>;
-
-
-class LockFreeChannel {
-public:
-private:
-};
+using UChannel = Channel<T, std::list>;
 
 
 namespace LockFree {
@@ -395,8 +403,8 @@ namespace LockFree {
             // Do Nothing
         }
 
-        template <typename U>
-        Node(U&& data) : data(std::forward<U>(data)), next(nullptr) {
+        template <typename... U>
+        Node(U&&... data) : data(std::forward<U>(data)...), next(nullptr) {
             // Do Nothing
         }
     };
@@ -404,12 +412,14 @@ namespace LockFree {
     template <typename T>
     class List {
     public:
-        List() : head(), tail(&head), num_data(0) {
+        List() : m_head(nullptr), m_tail(nullptr), m_runnable(true), m_size(0) {
             // Do Nothing
         }
 
         ~List() {
-            Node<T>* node = head.next;
+            m_runnable.store(false, std::memory_order_release);
+
+            Node<T>* node = m_head.load();
             while (node != nullptr) {
                 Node<T>* next = node->next;
                 delete node;
@@ -424,46 +434,82 @@ namespace LockFree {
         List& operator=(List&&) = delete;
 
         void push_back(T const& data) {
-            Node<T>* node = new Node<T>(data);
+            push_node(new Node<T>(data));
+        }
 
+        void push_back(T&& data) {
+            push_node(new Node<T>(std::move(data)));
+        }
+
+        template <typename... U>
+        void emplace_back(U&&... args) {
+            push_node(new Node<T>(std::forward<U>(args)...));
+        }
+
+        void push_node(Node<T>* node) {
+            bool run = false;
             Node<T>* prev = nullptr;
             do {
-                prev = tail.load(std::memory_order_relaxed);
-            } while (!tail.compare_exchange_weak(prev,
+                run = runnable();
+                prev = m_tail.load(std::memory_order_relaxed);
+            } while (
+                run
+                && !m_tail.compare_exchange_weak(prev,
                                                  node,
                                                  std::memory_order_relaxed,
                                                  std::memory_order_relaxed));
-            prev->next.store(node, std::memory_order_relaxed);
-            ++num_data;
+            if (run) {
+                if (prev != nullptr) {
+                    prev->next.store(node, std::memory_order_relaxed);
+                }
+                else {
+                    m_head.store(node, std::memory_order_relaxed);
+                }
+                ++m_size;
+            }
         }
 
-        template <typename U = std::chrono::microseconds>
-        T pop_front(U const& prevent_deadlock = platform::prevent_deadlock) {
-            Node<T>* node;
+        template <typename U = decltype(platform::prevent_deadlock)>
+        platform::optional<T> pop_front(U const& prevent_deadlock
+                                        = platform::prevent_deadlock) {
+            bool run = false;
+            Node<T>* node = nullptr;
             do {
                 std::this_thread::sleep_for(prevent_deadlock);
-                node = head.next.load(std::memory_order_relaxed);
-            } while (
-                !node
-                || !head.next.compare_exchange_weak(node,
-                                                    node->next,
-                                                    std::memory_order_relaxed,
-                                                    std::memory_order_relaxed));
-            --num_data;
-            T res = std::move(node->data);
 
-            delete node;
-            return res;
+                run = readable();
+                node = m_head.load(std::memory_order_relaxed);
+            } while (run
+                     && (!node
+                         || !m_head.compare_exchange_weak(
+                                node,
+                                node->next,
+                                std::memory_order_relaxed,
+                                std::memory_order_relaxed)));
+            if (run) {
+                if (node->next == nullptr) {
+                    m_tail.store(nullptr, std::memory_order_relaxed);
+                }
+                --m_size;
+                T res = std::move(node->data);
+
+                delete node;
+                return platform::optional<T>(res);
+            }
+            return platform::nullopt;
         }
 
         platform::optional<T> try_pop() {
-            Node<T>* node = head.next.load(std::memory_order_relaxed);
-            if (node
-                && head.next.compare_exchange_weak(node,
-                                                   node->next,
-                                                   std::memory_order_relaxed,
-                                                   std::memory_order_relaxed)) {
-                --num_data;
+            Node<T>* node = m_head.load(std::memory_order_relaxed);
+            if (readable() && node
+                && m_head.compare_exchange_weak(node,
+                                                node->next,
+                                                std::memory_order_relaxed,
+                                                std::memory_order_relaxed)) {
+                if (node->next == nullptr) {
+                    m_tail.store(nullptr, std::memory_order_relaxed);
+                }
+                --m_size;
                 T res = std::move(node->data);
 
                 delete node;
@@ -473,18 +519,115 @@ namespace LockFree {
         }
 
         size_t size() const {
-            return num_data;
+            return m_size.load(std::memory_order_relaxed);
         }
 
-        Node<T>* node() {
-            return head.next;
+        Node<T>* head() {
+            return m_head.load(std::memory_order_relaxed);
+        }
+
+        Node<T>* tail() {
+            return m_tail.load(std::memory_order_relaxed);
+        }
+
+        bool runnable() const {
+            return m_runnable.load(std::memory_order_relaxed);
+        }
+
+        bool readable() const {
+            return runnable()
+                   || m_head.load(std::memory_order_relaxed) != nullptr;
+        }
+
+        void interrupt() {
+            m_runnable.store(false, std::memory_order_relaxed);
+        }
+
+        void resume() {
+            m_runnable.store(true, std::memory_order_relaxed);
         }
 
     private:
-        Node<T> head;
-        std::atomic<Node<T>*> tail;
+        std::atomic<Node<T>*> m_head;
+        std::atomic<Node<T>*> m_tail;
 
-        std::atomic<size_t> num_data;
+        std::atomic<bool> m_runnable;
+        std::atomic<size_t> m_size;
+    };
+}  // namespace LockFree
+
+
+namespace LockFree {
+    template <typename T>
+    class Channel {
+    public:
+        using value_type = T;
+        using iterator = ChannelIterator<T, Channel>;
+
+        Channel() : buffer() {
+            // Do Nothing
+        }
+
+        Channel(Channel const&) = delete;
+        Channel(Channel&&) = delete;
+
+        Channel& operator=(Channel const&) = delete;
+        Channel& operator=(Channel&&) = delete;
+
+        template <typename... U>
+        void Add(U&&... task) {
+            buffer.emplace_back(std::forward<U>(task)...);
+        }
+
+        template <typename U>
+        Channel& operator<<(U&& task) {
+            buffer.emplace_back(std::forward<U>(task));
+            return *this;
+        }
+
+        platform::optional<T> Get() {
+            return buffer.pop_front();
+        }
+
+        platform::optional<T> TryGet() {
+            return buffer.try_pop();
+        }
+
+        Channel& operator>>(platform::optional<T>& get) {
+            get = buffer.pop_front();
+            return *this;
+        }
+
+        Channel& operator>>(T& get) {
+            platform::optional<T> res = buffer.pop_front();
+            if (res.has_value()) {
+                get = std::move(res.value());
+            }
+            return *this;
+        }
+
+        void Close() {
+            buffer.interrupt();
+        }
+
+        bool Runnable() const {
+            return buffer.runnable();
+        }
+
+        bool Readable() const {
+            return buffer.readable();
+        }
+
+        iterator begin() {
+            return iterator(*this, Get());
+        }
+
+        iterator end() {
+            return iterator(*this, platform::nullopt);
+        }
+
+    private:
+        List<T> buffer;
     };
 }  // namespace LockFree
 
@@ -564,7 +707,9 @@ void select(T&&... matches) {
 }
 
 
-template <typename T, typename Container = RingBuffer<std::packaged_task<T()>>>
+template <typename T,
+          template <typename Elem, typename = std::allocator<Elem>>
+          class Container = RingBuffer>
 class ThreadPool {
 public:
     ThreadPool() : ThreadPool(std::thread::hardware_concurrency()) {
@@ -633,7 +778,7 @@ private:
 };
 
 template <typename T>
-using UThreadPool = ThreadPool<T, std::list<std::packaged_task<T()>>>;
+using UThreadPool = ThreadPool<T, std::list>;
 
 
 using ull = unsigned long long;
