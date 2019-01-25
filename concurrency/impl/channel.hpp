@@ -6,6 +6,7 @@
 #include <mutex>
 #include <thread>
 
+#include "channel_iter.hpp"
 #include "platform/optional.hpp"
 #include "ring_buffer.hpp"
 
@@ -14,6 +15,9 @@ template <typename T,
           class Container = RingBuffer>  // or Container = std::list
 class Channel {
 public:
+    using value_type = T;
+    using iterator = ChannelIterator<T, Channel>;
+
     template <typename... U>
     Channel(U&&... args) : buffer(std::forward<U>(args)...) {
         // Do Nothing
@@ -97,39 +101,12 @@ public:
         return runnable || buffer.size() > 0;
     }
 
-    struct Iterator {
-        Channel& channel;
-        platform::optional<T> item;
-
-        Iterator(Channel& channel, platform::optional<T>&& item)
-            : channel(channel), item(std::move(item)) {
-            // Do Nothing
-        }
-
-        T& operator*() {
-            return item.value();
-        }
-
-        const T& operator*() const {
-            return item.value();
-        }
-
-        Iterator& operator++() {
-            item = channel.Get();
-            return *this;
-        }
-
-        bool operator!=(const Iterator& other) const {
-            return item != other.item;
-        }
-    };
-
-    Iterator begin() {
-        return Iterator(*this, Get());
+    iterator begin() {
+        return ChannelIterator(*this, Get());
     }
 
-    Iterator end() {
-        return Iterator(*this, platform::nullopt);
+    iterator end() {
+        return ChannelIterator(*this, platform::nullopt);
     }
 
 private:
