@@ -5,7 +5,8 @@
 
 #include "channel.hpp"
 
-template <typename T, typename Container = RingBuffer<std::packaged_task<T()>>>
+template <typename T, 
+          template <typename> class Container = RingBuffer>
 class ThreadPool {
 public:
     ThreadPool() : ThreadPool(std::thread::hardware_concurrency()) {
@@ -74,6 +75,6 @@ private:
 };
 
 template <typename T>
-using UThreadPool = ThreadPool<T, std::list<std::packaged_task<T()>>>;
+using UThreadPool = ThreadPool<T, std::list>;
 
 #endif
