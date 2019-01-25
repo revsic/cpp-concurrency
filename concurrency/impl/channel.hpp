@@ -10,7 +10,8 @@
 #include "ring_buffer.hpp"
 
 template <typename T,
-          template<typename> class Container = RingBuffer>  // or Container = std::list
+          template <typename Elem, typename = std::allocator<Elem>>
+          class Container = RingBuffer>  // or Container = std::list
 class Channel {
 public:
     template <typename... U>
