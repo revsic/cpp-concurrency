@@ -10,7 +10,8 @@ namespace platform {
 #ifndef __APPLE__
     constexpr auto prevent_deadlock = 5us;
 #else
-    constexpr auto prevent_deadlock = 250us;
+    // constexpr auto prevent_deadlock = 150us;  // for personal mac
+    constexpr auto prevent_deadlock = 300us;  // for azure-pipeline mac
 #endif
 }  // namespace platform
 
