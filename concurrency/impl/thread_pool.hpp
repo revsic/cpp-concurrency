@@ -5,8 +5,9 @@
 
 #include "channel.hpp"
 
-template <typename T, 
-          template <typename> class Container = RingBuffer>
+template <typename T,
+          template <typename Elem, typename = std::allocator<Elem>>
+          class Container = RingBuffer>
 class ThreadPool {
 public:
     ThreadPool() : ThreadPool(std::thread::hardware_concurrency()) {
