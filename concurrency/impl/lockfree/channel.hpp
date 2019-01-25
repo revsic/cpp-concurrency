@@ -41,7 +41,7 @@ namespace LockFree {
         }
 
         Channel& operator>>(platform::optional<T>& get) {
-            get = buffer.try_pop();
+            get = buffer.pop_front();
             return *this;
         }
 
@@ -53,7 +53,7 @@ namespace LockFree {
             return *this;
         }
 
-        void Closs() {
+        void Close() {
             buffer.interrupt();
         }
 
@@ -61,20 +61,20 @@ namespace LockFree {
             return buffer.runnable();
         }
 
-        bool Readable() {
+        bool Readable() const {
             return buffer.readable();
         }
 
         iterator begin() {
-            return ChannelIterator(*this, Get());
+            return iterator(*this, Get());
         }
 
         iterator end() {
-            return ChannelIterator(*this, platform::nullopt);
+            return iterator(*this, platform::nullopt);
         }
 
-        private: 
-            List<T> buffer;
+    private:
+        List<T> buffer;
     };
 }  // namespace LockFree
 
