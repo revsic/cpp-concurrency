@@ -53,37 +53,47 @@ namespace LockFree {
         void push_back(T const& data) {
             Node<T>* node = new Node<T>(data);
 
+            bool run = false;
             Node<T>* prev = nullptr;
             do {
+                run = runnable();
                 prev = m_tail.load(std::memory_order_relaxed);
             } while (
-                m_runnable.load(std::memory_order_relaxed)
+                run
                 && !m_tail.compare_exchange_weak(prev,
                                                  node,
                                                  std::memory_order_relaxed,
                                                  std::memory_order_relaxed));
-            prev->next.store(node, std::memory_order_relaxed);
-            ++m_size;
+            if (run) {
+                prev->next.store(node, std::memory_order_relaxed);
+                ++m_size;
+            }
         }
 
         template <typename U = decltype(platform::prevent_deadlock)>
-        T pop_front(U const& prevent_deadlock = platform::prevent_deadlock) {
-            Node<T>* node;
+        platform::optional<T> pop_front(U const& prevent_deadlock
+                                        = platform::prevent_deadlock) {
+            bool run = false;
+            Node<T>* node = nullptr;
             do {
                 std::this_thread::sleep_for(prevent_deadlock);
+                run = runnable();
                 node = m_head.next.load(std::memory_order_relaxed);
-            } while (m_runnable.load(std::memory_order_relaxed)
+            } while (run
                      && (!node
                          || !m_head.next.compare_exchange_weak(
                                 node,
                                 node->next,
                                 std::memory_order_relaxed,
                                 std::memory_order_relaxed)));
-            --m_size;
-            T res = std::move(node->data);
+            if (run) {
+                --m_size;
+                T res = std::move(node->data);
 
-            delete node;
-            return res;
+                delete node;
+                return platform::optional<T>(res);
+            }
+            return platform::nullopt;
         }
 
         platform::optional<T> try_pop() {
