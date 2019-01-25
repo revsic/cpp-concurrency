@@ -9,7 +9,9 @@ namespace platform {
 #ifndef __APPLE__
     constexpr std::chrono::microseconds prevent_deadlock(5);
 #else
-    constexpr std::chrono::microseconds prevent_deadlock(150);
+    // constexpr std::chrono::microseconds prevent_deadlock(150);
+    using namespace std::literals;
+    constexpr auto prevent_deadlock = 1ms;
 #endif
 }  // namespace platform
 
