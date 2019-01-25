@@ -62,7 +62,7 @@ namespace LockFree {
             ++num_data;
         }
 
-        template <typename U = std::chrono::microseconds>
+        template <typename U = decltype(platform::prevent_deadlock)>
         T pop_front(U const& prevent_deadlock = platform::prevent_deadlock) {
             Node<T>* node;
             do {
