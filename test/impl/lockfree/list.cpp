@@ -1,6 +1,5 @@
 #include <catch2/catch.hpp>
 #include <lockfree/list.hpp>
-#include <platform/constant.hpp>
 #include <thread_pool.hpp>
 
 TEST_CASE("List::Initializer", "[lockfree/list]") {

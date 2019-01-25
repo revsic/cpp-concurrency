@@ -6,6 +6,7 @@
 #include <memory>
 #include <thread>
 
+#include "../platform/constant.hpp"
 #include "../platform/optional.hpp"
 
 namespace LockFree {
