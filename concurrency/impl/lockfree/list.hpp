@@ -29,11 +29,12 @@ namespace LockFree {
     template <typename T>
     class List {
     public:
-        List() : head(), tail(&head), num_data(0) {
+        List() : head(), tail(&head), runnable(true), num_data(0) {
             // Do Nothing
         }
 
         ~List() {
+            runnable = false;
             Node<T>* node = head.next;
             while (node != nullptr) {
                 Node<T>* next = node->next;
@@ -54,10 +55,11 @@ namespace LockFree {
             Node<T>* prev = nullptr;
             do {
                 prev = tail.load(std::memory_order_relaxed);
-            } while (!tail.compare_exchange_weak(prev,
-                                                 node,
-                                                 std::memory_order_relaxed,
-                                                 std::memory_order_relaxed));
+            } while (runnable
+                     && !tail.compare_exchange_weak(prev,
+                                                    node,
+                                                    std::memory_order_relaxed,
+                                                    std::memory_order_relaxed));
             prev->next.store(node, std::memory_order_relaxed);
             ++num_data;
         }
@@ -68,12 +70,13 @@ namespace LockFree {
             do {
                 std::this_thread::sleep_for(prevent_deadlock);
                 node = head.next.load(std::memory_order_relaxed);
-            } while (
-                !node
-                || !head.next.compare_exchange_weak(node,
-                                                    node->next,
-                                                    std::memory_order_relaxed,
-                                                    std::memory_order_relaxed));
+            } while (runnable
+                     && (!node
+                         || !head.next.compare_exchange_weak(
+                                node,
+                                node->next,
+                                std::memory_order_relaxed,
+                                std::memory_order_relaxed)));
             --num_data;
             T res = std::move(node->data);
 
@@ -83,7 +86,7 @@ namespace LockFree {
 
         platform::optional<T> try_pop() {
             Node<T>* node = head.next.load(std::memory_order_relaxed);
-            if (node
+            if (runnable && node
                 && head.next.compare_exchange_weak(node,
                                                    node->next,
                                                    std::memory_order_relaxed,
@@ -109,6 +112,7 @@ namespace LockFree {
         Node<T> head;
         std::atomic<Node<T>*> tail;
 
+        bool runnable;
         std::atomic<size_t> num_data;
     };
 }  // namespace LockFree
