@@ -4,7 +4,7 @@
 #include <memory>
 #include <type_traits>
 
-template <typename T>
+template <typename T, typename = void>  // for stl compatiblity
 class RingBuffer {
 public:
     static_assert(std::is_default_constructible_v<T>,
