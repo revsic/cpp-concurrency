@@ -159,12 +159,25 @@ def none_preproc(dirname):
         
         data = ''.join(lines)
 
+        include_idx = data.find('// merge:np_include')
+        if include_idx != -1:
+            start_idx = include_idx + len('// merge:np_include')
+            end_idx = data.find('// merge:end', include_idx)
+            
+            includes += data[start_idx:end_idx]
+            data = data[end_idx + len('// merge:end'):]
+
         include_idx = data.find('// merge:include')
         if include_idx != -1:
             start_idx = include_idx + len('// merge:include')
             end_idx = data.find('// merge:end', include_idx)
-            
-            includes += data[start_idx:end_idx]
+
+            for line in data[start_idx:end_idx].split('\n'):
+                res = ReSupport.include(line)
+                if len(res) > 0:
+                    dep += res
+                    includes += line + '\n'
+
             data = data[end_idx + len('// merge:end'):]
 
         dep.append(files)
