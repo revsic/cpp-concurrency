@@ -1,5 +1,6 @@
 #include <catch2/catch.hpp>
 #include <lockfree/list.hpp>
+#include <platform/constant.hpp>
 #include <thread_pool.hpp>
 
 TEST_CASE("List::Initializer", "[lockfree/list]") {
@@ -34,7 +35,7 @@ TEST_CASE("List::push_back", "[lockfree/list]") {
     REQUIRE(acc == test_num * (test_num + 1) / 2);
 }
 
-TEST_CASE("List::pop_back", "[lockfree/list]") {
+TEST_CASE("List::pop_front", "[lockfree/list]") {
     LockFree::List<size_t> list;
 
     constexpr size_t test_num = 1000;
@@ -75,8 +76,7 @@ TEST_CASE("Concurrently push and pop", "[lockfree/list]") {
     std::vector<std::future<size_t>> pop_futs;
     auto pop = pop_pool.Add([&] {
         for (size_t i = 0; i < test_num; ++i) {
-            pop_futs.push_back(
-                pop_pool.Add([&, i] { return list.pop_front(); }));
+            pop_futs.push_back(pop_pool.Add([&] { return list.pop_front(); }));
         }
         return 0;
     });
@@ -148,7 +148,7 @@ TEST_CASE("Concurrently push and try_pop", "[lockfree/list]") {
             pop_futs.push_back(pop_pool.Add([&, i] {
                 platform::optional<size_t> res;
                 do {
-                    std::this_thread::sleep_for(5us);
+                    std::this_thread::sleep_for(platform::prevent_deadlock);
                     res = list.try_pop();
                 } while (!res.has_value());
                 return res.value();
