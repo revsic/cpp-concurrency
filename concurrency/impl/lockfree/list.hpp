@@ -77,6 +77,7 @@ namespace LockFree {
             Node<T>* node = nullptr;
             do {
                 std::this_thread::sleep_for(prevent_deadlock);
+
                 run = runnable();
                 node = m_head.next.load(std::memory_order_relaxed);
             } while (run
