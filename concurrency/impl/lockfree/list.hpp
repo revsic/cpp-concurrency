@@ -98,7 +98,7 @@ namespace LockFree {
 
         platform::optional<T> try_pop() {
             Node<T>* node = m_head.next.load(std::memory_order_relaxed);
-            if (m_runnable.load(std::memory_order_relaxed) && node
+            if (runnable() && node
                 && m_head.next.compare_exchange_weak(
                        node,
                        node->next,
