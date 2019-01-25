@@ -29,14 +29,14 @@ namespace LockFree {
     template <typename T>
     class List {
     public:
-        List() : head(), tail(&head), runnable(true), num_data(0) {
+        List() : m_head(), m_tail(&m_head), m_runnable(true), m_size(0) {
             // Do Nothing
         }
 
         ~List() {
-            runnable.store(false, std::memory_order_release);
+            m_runnable.store(false, std::memory_order_release);
 
-            Node<T>* node = head.next;
+            Node<T>* node = m_head.next;
             while (node != nullptr) {
                 Node<T>* next = node->next;
                 delete node;
@@ -55,14 +55,15 @@ namespace LockFree {
 
             Node<T>* prev = nullptr;
             do {
-                prev = tail.load(std::memory_order_relaxed);
-            } while (runnable.load(std::memory_order_relaxed)
-                     && !tail.compare_exchange_weak(prev,
-                                                    node,
-                                                    std::memory_order_relaxed,
-                                                    std::memory_order_relaxed));
+                prev = m_tail.load(std::memory_order_relaxed);
+            } while (
+                m_runnable.load(std::memory_order_relaxed)
+                && !m_tail.compare_exchange_weak(prev,
+                                                 node,
+                                                 std::memory_order_relaxed,
+                                                 std::memory_order_relaxed));
             prev->next.store(node, std::memory_order_relaxed);
-            ++num_data;
+            ++m_size;
         }
 
         template <typename U = decltype(platform::prevent_deadlock)>
@@ -70,15 +71,15 @@ namespace LockFree {
             Node<T>* node;
             do {
                 std::this_thread::sleep_for(prevent_deadlock);
-                node = head.next.load(std::memory_order_relaxed);
-            } while (runnable.load(std::memory_order_relaxed)
+                node = m_head.next.load(std::memory_order_relaxed);
+            } while (m_runnable.load(std::memory_order_relaxed)
                      && (!node
-                         || !head.next.compare_exchange_weak(
+                         || !m_head.next.compare_exchange_weak(
                                 node,
                                 node->next,
                                 std::memory_order_relaxed,
                                 std::memory_order_relaxed)));
-            --num_data;
+            --m_size;
             T res = std::move(node->data);
 
             delete node;
@@ -86,13 +87,14 @@ namespace LockFree {
         }
 
         platform::optional<T> try_pop() {
-            Node<T>* node = head.next.load(std::memory_order_relaxed);
-            if (runnable.load(std::memory_order_relaxed) && node
-                && head.next.compare_exchange_weak(node,
-                                                   node->next,
-                                                   std::memory_order_relaxed,
-                                                   std::memory_order_relaxed)) {
-                --num_data;
+            Node<T>* node = m_head.next.load(std::memory_order_relaxed);
+            if (m_runnable.load(std::memory_order_relaxed) && node
+                && m_head.next.compare_exchange_weak(
+                       node,
+                       node->next,
+                       std::memory_order_relaxed,
+                       std::memory_order_relaxed)) {
+                --m_size;
                 T res = std::move(node->data);
 
                 delete node;
@@ -102,19 +104,31 @@ namespace LockFree {
         }
 
         size_t size() const {
-            return num_data;
+            return m_size.load(std::memory_order_relaxed);
         }
 
         Node<T>* node() {
-            return head.next;
+            return m_head.next.load(std::memory_order_relaxed);
+        }
+
+        bool runnable() const {
+            return m_runnable.load(std::memory_order_relaxed);
+        }
+
+        void interrupt() {
+            m_runnable.store(false, std::memory_order_relaxed);
+        }
+
+        void resume() {
+            m_runnable.store(true, std::memory_order_relaxed);
         }
 
     private:
-        Node<T> head;
-        std::atomic<Node<T>*> tail;
+        Node<T> m_head;
+        std::atomic<Node<T>*> m_tail;
 
-        std::atomic<bool> runnable;
-        std::atomic<size_t> num_data;
+        std::atomic<bool> m_runnable;
+        std::atomic<size_t> m_size;
     };
 }  // namespace LockFree
 
