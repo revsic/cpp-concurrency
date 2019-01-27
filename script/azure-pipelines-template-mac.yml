@@ -4,7 +4,7 @@ jobs:
     vmImage: ${{ parameters.vmImage }}
   steps:
   - script: git submodule update --init
-    displayName: initialize submodule
+    displayName: Initialize submodule
 
   - task: CMake@1
     inputs:
@@ -16,4 +16,4 @@ jobs:
     displayName: GNU Make catch_test
 
   - script: ./build/catch_test
-    displayName: run catch_test
+    displayName: Run catch_test
