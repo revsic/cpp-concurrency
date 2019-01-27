@@ -8,16 +8,16 @@ jobs:
 
   - task: CMake@1
     inputs:
-      workingDirectory: build
-      cmakeArgs: ..\test
+      workingDirectory: .\test\build
+      cmakeArgs: ..\
     displayName: CMake catch_test
 
   - task: MSBuild@1
     inputs: 
-      solution: .\build\catch_test.sln
+      solution: .\test\build\catch_test.sln
     displayName: MSBuild catch_test
 
-  - script: .\build\Debug\catch_test.exe
+  - script: .\test\build\Debug\catch_test.exe
     displayName: Start catch_test
 
   - task: UsePythonVersion@0
@@ -30,17 +30,17 @@ jobs:
 
   - task: CMake@1
     inputs:
-      workingDirectory: build
-      cmakeArgs: ..\sample
+      workingDirectory: .\sample\build
+      cmakeArgs: ..\
     displayName: CMake sample
 
   - task: MSBuild@1
     inputs:
-      solution: .\build\sample.sln
+      solution: .\sample\build\sample.sln
     displayName: MSBuild sample
   
-  - script: .\build\Debug\dir_size.exe .
+  - script: .\sample\build\Debug\dir_size.exe ..
     displayName: Start dir_size
   
-  - script: .\build\Debug\tick.exe
+  - script: .\sample\build\Debug\tick.exe
     displayName: start tick
