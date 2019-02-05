@@ -5,14 +5,8 @@
 
 #include "channel.hpp"
 
-template <template <typename> class Higher, template <typename> class Base>
-struct TypeCurry {
-    template <typename U>
-    using type = Higher<Base<U>>;
-};
-
 template <typename T,
-          template <typename> class ChannelType = TypeCurry<Channel, TSList>::type>
+          template <typename> class ChannelType = RChannel>
 class ThreadPool {
 public:
     ThreadPool() : ThreadPool(std::thread::hardware_concurrency()) {
@@ -80,5 +74,8 @@ private:
     ChannelType<std::packaged_task<T()>> channel;
     std::unique_ptr<std::thread[]> threads;
 };
+
+template <typename T>
+using LThreadPool = ThreadPool<T, TSList>;
 
 #endif
