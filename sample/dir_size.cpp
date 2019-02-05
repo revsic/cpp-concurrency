@@ -24,8 +24,8 @@ ull sizeof_dir(fs::path const& path) {
 
 ull par_sizeof_dir(fs::path const& path) {
     WaitGroup wg = 1;
-    Channel<TSList<ull>> channel;
-    ThreadPool<void> pool;
+    LChannel<ull> channel;
+    LThreadPool<void> pool;
 
     std::function<void(fs::path const&)> par = [&](fs::path const& path) {
         if (fs::is_regular_file(path)) {

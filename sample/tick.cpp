@@ -4,12 +4,12 @@
 
 using namespace std::literals;
 
-ThreadPool<void> global_pool;
+LThreadPool<void> global_pool;
 inline auto sleep = [](auto dur) { std::this_thread::sleep_for(dur); };
 
 template <typename T>
-auto Tick(T dur, ThreadPool<void>& pool = global_pool) {
-    auto tick = std::make_unique<Channel<TSList<int>>>();;
+auto Tick(T dur, LThreadPool<void>& pool = global_pool) {
+    auto tick = std::make_unique<LChannel<int>>();;
     pool.Add([tick = tick.get()]{
         while (tick->Runnable()) {
             sleep(100ms);
@@ -20,8 +20,8 @@ auto Tick(T dur, ThreadPool<void>& pool = global_pool) {
 }
 
 template <typename T>
-auto After(T dur, ThreadPool<void>& pool = global_pool) {
-    auto after = std::make_unique<Channel<TSList<int>>>();
+auto After(T dur, LThreadPool<void>& pool = global_pool) {
+    auto after = std::make_unique<LChannel<int>>();
     pool.Add([=, after = after.get()]{ sleep(dur); after->Add(0); });
     return std::move(after);
 }
