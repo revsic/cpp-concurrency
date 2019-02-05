@@ -1,44 +1,30 @@
 #ifndef CHANNEL_HPP
 #define CHANNEL_HPP
 
-#include <condition_variable>
-#include <list>
-#include <mutex>
-#include <thread>
-
 #include "channel_iter.hpp"
+#include "lockbase/thread_safe.hpp"
 #include "platform/optional.hpp"
-#include "ring_buffer.hpp"
 
-template <typename T,
-          template <typename Elem, typename = std::allocator<Elem>>
-          class Container = RingBuffer>  // or Container = std::list
+template <typename Container>
 class Channel {
 public:
-    using value_type = T;
-    using iterator = ChannelIterator<T, Channel>;
+    using value_type = typename Container::value_type;
+    using iterator = ChannelIterator<value_type, Container>;
 
     template <typename... U>
     Channel(U&&... args) : buffer(std::forward<U>(args)...) {
         // Do Nothing
     }
 
-    Channel(const Channel&) = delete;
+    Channel(Channel const&) = delete;
     Channel(Channel&&) = delete;
 
     Channel& operator=(const Channel&) = delete;
     Channel& operator=(Channel&&) = delete;
 
     template <typename... U>
-    void Add(U&&... task) {
-        std::unique_lock lock(mtx);
-        cv.wait(lock,
-                [&] { return !runnable || buffer.size() < buffer.max_size(); });
-
-        if (runnable) {
-            buffer.emplace_back(std::forward<U>(task)...);
-        }
-        cv.notify_all();
+    void Add(U&&... args) {
+        buffer.emplace_back(std::forward<U>(args)...);
     }
 
     template <typename U>
@@ -47,40 +33,21 @@ public:
         return *this;
     }
 
-    platform::optional<T> Get() {
-        std::unique_lock lock(mtx);
-        cv.wait(lock, [&] { return !runnable || buffer.size() > 0; });
-
-        if (!runnable && buffer.size() == 0) {
-            return platform::nullopt;
-        }
-
-        T given = std::move(buffer.front());
-        buffer.pop_front();
-
-        cv.notify_all();
-        return platform::optional<T>(std::move(given));
+    platform::optional<value_type> Get() {
+        return buffer.pop_front();
     }
 
-    platform::optional<T> TryGet() {
-        std::unique_lock lock(mtx, std::try_to_lock);
-        if (lock.owns_lock() && buffer.size() > 0) {
-            T given = std::move(buffer.front());
-            buffer.pop_front();
-
-            cv.notify_all();
-            return platform::optional<T>(std::move(given));
-        }
-        return platform::nullopt;
+    platform::optional<value_type> TryGet() {
+        return buffer.try_pop();
     }
 
-    Channel& operator>>(platform::optional<T>& get) {
+    Channel& operator>>(platform::optional<value_type>& get) {
         get = Get();
         return *this;
     }
 
-    Channel& operator>>(T& get) {
-        platform::optional<T> res = Get();
+    Channel& operator>>(value_type& get) {
+        platform::optional<value_type> res = Get();
         if (res.has_value()) {
             get = std::move(res.value());
         }
@@ -88,17 +55,15 @@ public:
     }
 
     void Close() {
-        runnable = false;
-        cv.notify_all();
+        buffer.close();
     }
 
     bool Runnable() const {
-        return runnable;
+        return buffer.runnable();
     }
 
     bool Readable() {
-        std::unique_lock lock(mtx);
-        return runnable || buffer.size() > 0;
+        return buffer.Readable();
     }
 
     iterator begin() {
@@ -110,14 +75,7 @@ public:
     }
 
 private:
-    Container<T> buffer;
-    std::atomic<bool> runnable = true;
-
-    std::mutex mtx;
-    std::condition_variable cv;
+    Container buffer;
 };
-
-template <typename T>
-using UChannel = Channel<T, std::list>;
 
 #endif
