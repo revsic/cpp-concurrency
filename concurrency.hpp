@@ -11,13 +11,13 @@
 #include <type_traits>
 
 #define CHANNEL_ITER_HPP
-#define RING_BUFFER_HPP
+#define LOCKBASE_THREAD_SAFE_HPP
 #define CHANNEL_HPP
-#define LOCK_FREE_LIST_HPP
-#define LOCK_FREE_CHANNEL_HPP
-#define SELECT_HPP
 #define THREAD_POOL_HPP
+#define LOCKFREE_LIST_HPP
 #define WAIT_GROUP_HPP
+#define CONTAINER_RING_BUFFER_HPP
+#define SELECT_HPP
 
 #include <chrono>
 
@@ -202,7 +202,7 @@ public:
         return item.value();
     }
 
-    const T& operator*() const {
+    T const& operator*() const {
         return item.value();
     }
 
@@ -211,7 +211,7 @@ public:
         return *this;
     }
 
-    bool operator!=(const ChannelIterator& other) const {
+    bool operator!=(ChannelIterator const& other) const {
         return item != other.item;
     }
 
@@ -221,95 +221,137 @@ private:
 };
 
 
-template <typename T, typename = void>  // for stl compatiblity
-class RingBuffer {
+template <typename Cont, typename Mutex = std::mutex>
+class ThreadSafe {
 public:
-    static_assert(std::is_default_constructible_v<T>,
-                  "RingBuffer base type must be default constructible");
+    using value_type = typename Cont::value_type;
 
-    RingBuffer() : RingBuffer(1) {
+    template <typename... Args>
+    ThreadSafe(Args&&... args)
+        : m_runnable(true), buffer(std::forward<Args>(args)...) {
         // Do Nothing
     }
 
-    RingBuffer(size_t size_buffer)
-        : size_buffer(size_buffer), buffer(std::make_unique<T[]>(size_buffer)) {
-        // Do Nothing
+    ~ThreadSafe() {
+        close();
     }
 
-    RingBuffer(const RingBuffer&) = delete;
-    RingBuffer(RingBuffer&&) = delete;
+    ThreadSafe(ThreadSafe const&) = delete;
+    ThreadSafe(ThreadSafe&&) = delete;
 
-    RingBuffer& operator=(const RingBuffer&) = delete;
-    RingBuffer& operator=(RingBuffer&&) = delete;
+    ThreadSafe& operator=(ThreadSafe const&) = delete;
+    ThreadSafe& operator=(ThreadSafe&&) = delete;
 
     template <typename... U>
     void emplace_back(U&&... args) {
-        buffer[ptr_tail] = T(std::forward<U>(args)...);
+        std::unique_lock lock(mutex);
+        cond.wait(lock, [&] {
+            return !m_runnable || buffer.size() < buffer.max_size();
+        });
 
-        num_data += 1;
-        ptr_tail = (ptr_tail + 1) % size_buffer;
+        if (m_runnable) {
+            buffer.emplace_back(std::forward<U>(args)...);
+        }
+        cond.notify_all();
     }
 
-    void pop_front() {
-        num_data -= 1;
-        ptr_head = (ptr_head + 1) % size_buffer;
+    void push_back(value_type const& value) {
+        std::unique_lock lock(mutex);
+        cond.wait(lock, [&] {
+            return !m_runnable || buffer.size() < buffer.max_size();
+        });
+
+        if (m_runnable) {
+            buffer.push_back(value);
+        }
+        cond.notify_all();
     }
 
-    T& front() {
-        return buffer[ptr_head];
+    void push_back(value_type&& value) {
+        std::unique_lock lock(mutex);
+        cond.wait(lock, [&] {
+            return !m_runnable || buffer.size() < buffer.max_size();
+        });
+
+        if (m_runnable) {
+            buffer.push_back(std::move(value));
+        }
+        cond.notify_all();
     }
 
-    const T& front() const {
-        return buffer[ptr_head];
+    platform::optional<value_type> pop_front() {
+        std::unique_lock lock(mutex);
+        cond.wait(lock, [&] { return !m_runnable || buffer.size() > 0; });
+
+        if (!m_runnable && buffer.size() == 0) {
+            return platform::nullopt;
+        }
+
+        value_type given = std::move(buffer.front());
+        buffer.pop_front();
+
+        cond.notify_all();
+        return platform::optional<value_type>(std::move(given));
     }
 
-    size_t size() const {
-        return num_data;
+    platform::optional<value_type> try_pop() {
+        std::unique_lock lock(mutex, std::try_to_lock);
+        if (lock.owns_lock() && buffer.size() > 0) {
+            value_type given = std::move(buffer.front());
+            buffer.pop_front();
+
+            cond.notify_all();
+            return platform::optional<value_type>(std::move(given));
+        }
+        return platform::nullopt;
     }
 
-    size_t max_size() const {
-        return size_buffer;
+    void close() {
+        m_runnable = false;
+        cond.notify_all();
+    }
+
+    bool runnable() const {
+        return m_runnable;
+    }
+
+    bool readable() {
+        std::unique_lock lock(mutex);
+        return m_runnable || buffer.size() > 0;
     }
 
 private:
-    size_t size_buffer;
-    std::unique_ptr<T[]> buffer;
+    bool m_runnable;
+    Cont buffer;
 
-    size_t num_data = 0;
-    size_t ptr_head = 0;
-    size_t ptr_tail = 0;
+    Mutex mutex;
+    std::condition_variable cond;
 };
 
+template <typename T>
+using TSList = ThreadSafe<std::list<T>>;
 
-template <typename T,
-          template <typename Elem, typename = std::allocator<Elem>>
-          class Container = RingBuffer>  // or Container = std::list
+
+template <typename Container>
 class Channel {
 public:
-    using value_type = T;
-    using iterator = ChannelIterator<T, Channel>;
+    using value_type = typename Container::value_type;
+    using iterator = ChannelIterator<value_type, Container>;
 
     template <typename... U>
     Channel(U&&... args) : buffer(std::forward<U>(args)...) {
         // Do Nothing
     }
 
-    Channel(const Channel&) = delete;
+    Channel(Channel const&) = delete;
     Channel(Channel&&) = delete;
 
     Channel& operator=(const Channel&) = delete;
     Channel& operator=(Channel&&) = delete;
 
     template <typename... U>
-    void Add(U&&... task) {
-        std::unique_lock lock(mtx);
-        cv.wait(lock,
-                [&] { return !runnable || buffer.size() < buffer.max_size(); });
-
-        if (runnable) {
-            buffer.emplace_back(std::forward<U>(task)...);
-        }
-        cv.notify_all();
+    void Add(U&&... args) {
+        buffer.emplace_back(std::forward<U>(args)...);
     }
 
     template <typename U>
@@ -318,40 +360,21 @@ public:
         return *this;
     }
 
-    platform::optional<T> Get() {
-        std::unique_lock lock(mtx);
-        cv.wait(lock, [&] { return !runnable || buffer.size() > 0; });
-
-        if (!runnable && buffer.size() == 0) {
-            return platform::nullopt;
-        }
-
-        T given = std::move(buffer.front());
-        buffer.pop_front();
-
-        cv.notify_all();
-        return platform::optional<T>(std::move(given));
+    platform::optional<value_type> Get() {
+        return buffer.pop_front();
     }
 
-    platform::optional<T> TryGet() {
-        std::unique_lock lock(mtx, std::try_to_lock);
-        if (lock.owns_lock() && buffer.size() > 0) {
-            T given = std::move(buffer.front());
-            buffer.pop_front();
-
-            cv.notify_all();
-            return platform::optional<T>(std::move(given));
-        }
-        return platform::nullopt;
+    platform::optional<value_type> TryGet() {
+        return buffer.try_pop();
     }
 
-    Channel& operator>>(platform::optional<T>& get) {
+    Channel& operator>>(platform::optional<value_type>& get) {
         get = Get();
         return *this;
     }
 
-    Channel& operator>>(T& get) {
-        platform::optional<T> res = Get();
+    Channel& operator>>(value_type& get) {
+        platform::optional<value_type> res = Get();
         if (res.has_value()) {
             get = std::move(res.value());
         }
@@ -359,17 +382,15 @@ public:
     }
 
     void Close() {
-        runnable = false;
-        cv.notify_all();
+        buffer.close();
     }
 
     bool Runnable() const {
-        return runnable;
+        return buffer.runnable();
     }
 
     bool Readable() {
-        std::unique_lock lock(mtx);
-        return runnable || buffer.size() > 0;
+        return buffer.Readable();
     }
 
     iterator begin() {
@@ -381,19 +402,88 @@ public:
     }
 
 private:
-    Container<T> buffer;
-    std::atomic<bool> runnable = true;
-
-    std::mutex mtx;
-    std::condition_variable cv;
+    Container buffer;
 };
 
-template <typename T>
-using UChannel = Channel<T, std::list>;
+
+template <template <typename> class Higher, template <typename> class Base>
+struct TypeCurry {
+    template <typename U>
+    using type = Higher<Base<U>>;
+};
+
+template <typename T,
+          template <typename> class ChannelType = TypeCurry<Channel, TSList>::type>
+class ThreadPool {
+public:
+    ThreadPool() : ThreadPool(std::thread::hardware_concurrency()) {
+        // Do Nothing
+    }
+
+    template <typename... Args>
+    ThreadPool(size_t num_threads, Args&&... args)
+        : runnable(true), num_threads(num_threads),
+          channel(std::forward<Args>(args)...),
+          threads(std::make_unique<std::thread[]>(num_threads)) {
+        for (size_t i = 0; i < num_threads; ++i) {
+            threads[i] = std::thread([this] {
+                while (runnable) {
+                    auto given = channel.Get();
+                    if (!given.has_value()) {
+                        break;
+                    }
+                    given.value()();
+                }
+            });
+        }
+    }
+
+    ~ThreadPool() {
+        Stop();
+    }
+
+    ThreadPool(const ThreadPool&) = delete;
+    ThreadPool(ThreadPool&&) = delete;
+
+    ThreadPool& operator=(const ThreadPool&) = delete;
+    ThreadPool& operator=(ThreadPool&&) = delete;
+
+    template <typename F>
+    std::future<T> Add(F&& task) {
+        std::packaged_task<T()> ptask(std::forward<F>(task));
+        std::future<T> fut = ptask.get_future();
+        channel.Add(std::move(ptask));
+        return fut;
+    }
+
+    size_t GetNumThreads() const {
+        return num_threads;
+    }
+
+    void Stop() {
+        if (threads != nullptr) {
+            runnable = false;
+            channel.Close();
+
+            for (size_t i = 0; i < num_threads; ++i) {
+                if (threads[i].joinable()) {
+                    threads[i].join();
+                }
+            }
+            threads.reset();
+        }
+    }
+
+private:
+    bool runnable;
+    size_t num_threads;
+
+    ChannelType<std::packaged_task<T()>> channel;
+    std::unique_ptr<std::thread[]> threads;
+};
 
 
 namespace LockFree {
-
     template <typename T>
     struct Node {
         T data;
@@ -557,79 +647,95 @@ namespace LockFree {
 }  // namespace LockFree
 
 
-namespace LockFree {
-    template <typename T>
-    class Channel {
-    public:
-        using value_type = T;
-        using iterator = ChannelIterator<T, Channel>;
+using ull = unsigned long long;
 
-        Channel() : buffer() {
-            // Do Nothing
+class WaitGroup {
+public:
+    WaitGroup() : visit(0) {
+        // Do Nothing
+    }
+
+    WaitGroup(ull visit) : visit(visit) {
+        // Do Nothing
+    }
+
+    ull Add() {
+        return (visit += 1);
+    }
+
+    ull Done() {
+        return (visit -= 1);
+    }
+
+    void Wait() {
+        while (visit > 0) {
+            std::this_thread::yield();
         }
+    }
 
-        Channel(Channel const&) = delete;
-        Channel(Channel&&) = delete;
+private:
+    std::atomic<ull> visit;
+};
 
-        Channel& operator=(Channel const&) = delete;
-        Channel& operator=(Channel&&) = delete;
 
-        template <typename... U>
-        void Add(U&&... task) {
-            buffer.emplace_back(std::forward<U>(task)...);
-        }
+template <typename T, typename = void>  // for stl compatiblity
+class RingBuffer {
+public:
+    static_assert(std::is_default_constructible_v<T>,
+                  "RingBuffer base type must be default constructible");
 
-        template <typename U>
-        Channel& operator<<(U&& task) {
-            buffer.emplace_back(std::forward<U>(task));
-            return *this;
-        }
+    RingBuffer() : RingBuffer(1) {
+        // Do Nothing
+    }
 
-        platform::optional<T> Get() {
-            return buffer.pop_front();
-        }
+    RingBuffer(size_t size_buffer)
+        : size_buffer(size_buffer), buffer(std::make_unique<T[]>(size_buffer)) {
+        // Do Nothing
+    }
 
-        platform::optional<T> TryGet() {
-            return buffer.try_pop();
-        }
+    RingBuffer(RingBuffer const&) = delete;
+    RingBuffer(RingBuffer&&) = delete;
 
-        Channel& operator>>(platform::optional<T>& get) {
-            get = buffer.pop_front();
-            return *this;
-        }
+    RingBuffer& operator=(RingBuffer const&) = delete;
+    RingBuffer& operator=(RingBuffer&&) = delete;
 
-        Channel& operator>>(T& get) {
-            platform::optional<T> res = buffer.pop_front();
-            if (res.has_value()) {
-                get = std::move(res.value());
-            }
-            return *this;
-        }
+    template <typename... U>
+    void emplace_back(U&&... args) {
+        buffer[ptr_tail] = T(std::forward<U>(args)...);
 
-        void Close() {
-            buffer.interrupt();
-        }
+        num_data += 1;
+        ptr_tail = (ptr_tail + 1) % size_buffer;
+    }
 
-        bool Runnable() const {
-            return buffer.runnable();
-        }
+    void pop_front() {
+        num_data -= 1;
+        ptr_head = (ptr_head + 1) % size_buffer;
+    }
 
-        bool Readable() const {
-            return buffer.readable();
-        }
+    T& front() {
+        return buffer[ptr_head];
+    }
 
-        iterator begin() {
-            return iterator(*this, Get());
-        }
+    T const& front() const {
+        return buffer[ptr_head];
+    }
 
-        iterator end() {
-            return iterator(*this, platform::nullopt);
-        }
+    size_t size() const {
+        return num_data;
+    }
 
-    private:
-        List<T> buffer;
-    };
-}  // namespace LockFree
+    size_t max_size() const {
+        return size_buffer;
+    }
+
+private:
+    size_t size_buffer;
+    std::unique_ptr<T[]> buffer;
+
+    size_t num_data = 0;
+    size_t ptr_head = 0;
+    size_t ptr_tail = 0;
+};
 
 
 template <typename T, typename F>
@@ -705,120 +811,6 @@ void select(T&&... matches) {
         ;
     (try_action(matches), ...);
 }
-
-
-template <typename T, template <typename> class ChannelType>
-using ChannelTypeGen = ChannelType<std::packaged_task<T()>>;
-
-template <typename T, template <typename, template <typename, typename> class> class ChannelType,  template <typename, typename> class Container>
-using ChannelTypeGen2 = ChannelType<std::packaged_task<T()>, Container>;
-
-template <typename T, typename ChannelType = ChannelTypeGen2<T, Channel, RingBuffer>>
-class ThreadPool {
-public:
-    ThreadPool() : ThreadPool(std::thread::hardware_concurrency()) {
-        // Do Nothing
-    }
-
-    template <typename... Args>
-    ThreadPool(size_t num_threads, Args&&... args)
-        : runnable(true),
-          num_threads(num_threads),
-          channel(std::forward<Args>(args)...),
-          threads(std::make_unique<std::thread[]>(num_threads)) {
-        for (size_t i = 0; i < num_threads; ++i) {
-            threads[i] = std::thread([this] {
-                while (runnable) {
-                    auto given = channel.Get();
-                    if (!given.has_value()) {
-                        break;
-                    }
-                    given.value()();
-                }
-            });
-        }
-    }
-
-    ~ThreadPool() {
-        Stop();
-    }
-
-    ThreadPool(const ThreadPool&) = delete;
-    ThreadPool(ThreadPool&&) = delete;
-
-    ThreadPool& operator=(const ThreadPool&) = delete;
-    ThreadPool& operator=(ThreadPool&&) = delete;
-
-    template <typename F>
-    std::future<T> Add(F&& task) {
-        std::packaged_task<T()> ptask(std::forward<F>(task));
-        std::future<T> fut = ptask.get_future();
-        channel.Add(std::move(ptask));
-        return fut;
-    }
-
-    size_t GetNumThreads() const {
-        return num_threads;
-    }
-
-    void Stop() {
-        if (threads != nullptr) {
-            runnable = false;
-            channel.Close();
-
-            for (size_t i = 0; i < num_threads; ++i) {
-                if (threads[i].joinable()) {
-                    threads[i].join();
-                }
-            }
-            threads.reset();
-        }
-    }
-
-private:
-    bool runnable;
-    size_t num_threads;
-
-    ChannelType channel;
-    std::unique_ptr<std::thread[]> threads;
-};
-
-template <typename T>
-using UThreadPool = ThreadPool<T, ChannelTypeGen2<T, Channel, std::list>>;
-
-template <typename T>
-using LThreadPool = ThreadPool<T, ChannelTypeGen<T, LockFree::Channel>>;
-
-
-using ull = unsigned long long;
-
-class WaitGroup {
-public:
-    WaitGroup() : visit(0) {
-        // Do Nothing
-    }
-
-    WaitGroup(ull visit) : visit(visit) {
-        // Do Nothing
-    }
-
-    ull Add() {
-        return (visit += 1);
-    }
-
-    ull Done() {
-        return (visit -= 1);
-    }
-
-    void Wait() {
-        while (visit > 0) {
-            std::this_thread::yield();
-        }
-    }
-
-private:
-    std::atomic<ull> visit;
-};
 
 
 #endif
