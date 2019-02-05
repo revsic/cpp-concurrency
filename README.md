@@ -17,7 +17,7 @@ Include [concurrency.hpp](./concurrency.hpp) to use it.
 #include "concurrency.hpp"
 
 ThreadPool<int> pool;
-Channel<int> channel;
+LChannel<int> channel;
 WaitGroup wg;
 ```
 
@@ -37,12 +37,12 @@ cl /EHsc /std:c++17 ./sample/dir_size.cpp
 
 ## Channel
 
-- Channel<T> : finite capacity channel, if capacity exhausted, block channel and wait for space.
-- UChannel<T> : list like channel.
+- RChannel<T> : finite capacity channel, if capacity exhausted, block channel and wait for space.
+- LChannel<T> : list like channel.
 
 Add and get from channel.
 ```C++
-Channel<std::string> channel(3);
+RChannel<std::string> channel(3);
 channel.Add("test");
 
 std::optional<std::string> res = channel.Get();
@@ -59,15 +59,15 @@ channel >> res;
 
 Golang style channel range iteration.
 ```C++
-UChannel<int> uchannel;
+LChannel<int> channel;
 auto fut = std::async(std::launch::async, [&]{ 
     for (int i = 0; i < 3; ++i) {
-        uchannel << i;
+        channel << i;
     }
-    uchannel.Close();
+    channel.Close();
 });
 
-for (auto const& elem : uchannel) {
+for (auto const& elem : channel) {
     std::cout << elem << ' ';
 }
 std::cout << std::endl;
@@ -76,7 +76,7 @@ std::cout << std::endl;
 ## Thread Pool
 
 - ThreadPool<T> : finite task thread pool, if capacity exhausted, block new and wait for existing tasks to be terminated.
-- UThreadPool<T> : list based thread pool.
+- LThreadPool<T> : list based thread pool.
 
 Add new tasks and get return value from future.
 ```C++
