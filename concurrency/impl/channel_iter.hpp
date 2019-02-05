@@ -15,7 +15,7 @@ public:
         return item.value();
     }
 
-    const T& operator*() const {
+    T const& operator*() const {
         return item.value();
     }
 
@@ -24,7 +24,7 @@ public:
         return *this;
     }
 
-    bool operator!=(const ChannelIterator& other) const {
+    bool operator!=(ChannelIterator const& other) const {
         return item != other.item;
     }
 
