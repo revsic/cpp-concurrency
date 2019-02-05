@@ -1,5 +1,5 @@
-#ifndef LOCKBASE_THREAD_SAFE_HPP
-#define LOCKBASE_THREAD_SAFE_HPP
+#ifndef CONTAINER_THREAD_SAFE_HPP
+#define CONTAINER_THREAD_SAFE_HPP
 
 #include <condition_variable>
 #include <list>
@@ -7,6 +7,7 @@
 #include <mutex>
 
 #include "../platform/optional.hpp"
+#include "ring_buffer.hpp"
 
 template <typename Cont, typename Mutex = std::mutex>
 class ThreadSafe {
@@ -117,5 +118,8 @@ private:
 
 template <typename T>
 using TSList = ThreadSafe<std::list<T>>;
+
+template <typename T>
+using TSRingBuffer = ThreadSafe<RingBuffer<T>>;
 
 #endif
