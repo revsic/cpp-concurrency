@@ -129,7 +129,7 @@ def order_dep(deps, files, done):
     info = SourceInfo()
     for dep in deps:
         if in_endswith(dep, done) is None:
-            path = in_endswith(dep, files)
+            path = in_endswith(dep.split('/')[-1], files)
 
             if path is not None:
                 new = SourceInfo.read_file(path)
