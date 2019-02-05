@@ -787,7 +787,7 @@ private:
 };
 
 template <typename T>
-using LThreadPool = ThreadPool<T, TSList>;
+using LThreadPool = ThreadPool<T, LChannel>;
 
 
 using ull = unsigned long long;
