@@ -4,15 +4,15 @@
 #include <future>
 
 #include "channel.hpp"
-#include "lockfree/channel.hpp"
 
-template <typename T, template <typename> class ChannelType>
-using ChannelTypeGen = ChannelType<std::packaged_task<T()>>;
+template <template <typename> class Higher, template <typename> class Base>
+struct TypeCurry {
+    template <typename U>
+    using type = Higher<Base<U>>;
+};
 
-template <typename T, template <typename, template <typename, typename> class> class ChannelType,  template <typename, typename> class Container>
-using ChannelTypeGen2 = ChannelType<std::packaged_task<T()>, Container>;
-
-template <typename T, typename ChannelType = ChannelTypeGen2<T, Channel, RingBuffer>>
+template <typename T,
+          template <typename> class ChannelType = TypeCurry<Channel, TSList>::type>
 class ThreadPool {
 public:
     ThreadPool() : ThreadPool(std::thread::hardware_concurrency()) {
@@ -21,8 +21,7 @@ public:
 
     template <typename... Args>
     ThreadPool(size_t num_threads, Args&&... args)
-        : runnable(true),
-          num_threads(num_threads),
+        : runnable(true), num_threads(num_threads),
           channel(std::forward<Args>(args)...),
           threads(std::make_unique<std::thread[]>(num_threads)) {
         for (size_t i = 0; i < num_threads; ++i) {
@@ -78,14 +77,8 @@ private:
     bool runnable;
     size_t num_threads;
 
-    ChannelType channel;
+    ChannelType<std::packaged_task<T()>> channel;
     std::unique_ptr<std::thread[]> threads;
 };
-
-template <typename T>
-using UThreadPool = ThreadPool<T, ChannelTypeGen2<T, Channel, std::list>>;
-
-template <typename T>
-using LThreadPool = ThreadPool<T, ChannelTypeGen<T, LockFree::Channel>>;
 
 #endif
