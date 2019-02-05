@@ -2,7 +2,7 @@
 #define CHANNEL_HPP
 
 #include "channel_iter.hpp"
-#include "lockbase/thread_safe.hpp"
+#include "container/thread_safe.hpp"
 #include "platform/optional.hpp"
 
 template <typename Container>
