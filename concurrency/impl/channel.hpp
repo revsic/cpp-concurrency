@@ -9,7 +9,7 @@ template <typename Container>
 class Channel {
 public:
     using value_type = typename Container::value_type;
-    using iterator = ChannelIterator<value_type, Container>;
+    using iterator = ChannelIterator<value_type, Channel<Container>>;
 
     template <typename... U>
     Channel(U&&... args) : buffer(std::forward<U>(args)...) {
@@ -63,7 +63,7 @@ public:
     }
 
     bool Readable() {
-        return buffer.Readable();
+        return buffer.readable();
     }
 
     iterator begin() {
