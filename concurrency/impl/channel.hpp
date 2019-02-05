@@ -78,4 +78,10 @@ private:
     Container buffer;
 };
 
+template <typename T>
+using LChannel = Channel<TSList<T>>;
+
+template <typename T>
+using RChannel = Channel<TSRingBuffer<T>>;
+
 #endif
