@@ -1,5 +1,5 @@
-#ifndef RING_BUFFER_HPP
-#define RING_BUFFER_HPP
+#ifndef CONTAINER_RING_BUFFER_HPP
+#define CONTAINER_RING_BUFFER_HPP
 
 #include <memory>
 #include <type_traits>
@@ -19,10 +19,10 @@ public:
         // Do Nothing
     }
 
-    RingBuffer(const RingBuffer&) = delete;
+    RingBuffer(RingBuffer const&) = delete;
     RingBuffer(RingBuffer&&) = delete;
 
-    RingBuffer& operator=(const RingBuffer&) = delete;
+    RingBuffer& operator=(RingBuffer const&) = delete;
     RingBuffer& operator=(RingBuffer&&) = delete;
 
     template <typename... U>
@@ -42,7 +42,7 @@ public:
         return buffer[ptr_head];
     }
 
-    const T& front() const {
+    T const& front() const {
         return buffer[ptr_head];
     }
 
