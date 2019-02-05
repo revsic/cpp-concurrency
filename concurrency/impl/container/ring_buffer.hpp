@@ -7,6 +7,8 @@
 template <typename T, typename = void>  // for stl compatiblity
 class RingBuffer {
 public:
+    using value_type = T;
+
     static_assert(std::is_default_constructible_v<T>,
                   "RingBuffer base type must be default constructible");
 
