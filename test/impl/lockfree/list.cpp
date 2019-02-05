@@ -9,7 +9,7 @@ TEST_CASE("List::Initializer", "[lockfree/list]") {
 
 TEST_CASE("List::push_back", "[lockfree/list]") {
     LockFree::List<size_t> list;
-    UThreadPool<void> pool;
+    ThreadPool<void> pool;
 
     constexpr size_t test_num = 1000;
 
@@ -44,7 +44,7 @@ TEST_CASE("List::pop_front", "[lockfree/list]") {
 
     REQUIRE(list.size() == test_num);
 
-    UThreadPool<size_t> pool;
+    ThreadPool<size_t> pool;
     std::vector<std::future<size_t>> futs;
     for (size_t i = 0; i < test_num; ++i) {
         futs.emplace_back(pool.Add([&] { return list.pop_front().value(); }));
@@ -61,8 +61,8 @@ TEST_CASE("List::pop_front", "[lockfree/list]") {
 
 TEST_CASE("Concurrently push and pop", "[lockfree/list]") {
     LockFree::List<size_t> list;
-    UThreadPool<void> push_pool(5);
-    UThreadPool<size_t> pop_pool(5);
+    ThreadPool<void> push_pool(5);
+    ThreadPool<size_t> pop_pool(5);
 
     constexpr size_t test_num = 20;
 
@@ -108,7 +108,7 @@ TEST_CASE("List::try_pop", "[lockfree/list]") {
 
     REQUIRE(list.size() == test_num);
 
-    UThreadPool<size_t> pool;
+    ThreadPool<size_t> pool;
     std::vector<std::future<size_t>> futs;
     for (size_t i = 0; i < test_num; ++i) {
         futs.emplace_back(pool.Add([&] {
@@ -133,8 +133,8 @@ TEST_CASE("Concurrently push and try_pop", "[lockfree/list]") {
     using namespace std::literals;
 
     LockFree::List<size_t> list;
-    UThreadPool<void> push_pool(5);
-    UThreadPool<size_t> pop_pool(5);
+    ThreadPool<void> push_pool(5);
+    ThreadPool<size_t> pop_pool(5);
 
     constexpr size_t test_num = 20;
 

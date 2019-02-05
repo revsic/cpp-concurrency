@@ -1,5 +1,5 @@
-#ifndef LOCK_FREE_LIST_HPP
-#define LOCK_FREE_LIST_HPP
+#ifndef LOCKFREE_LIST_HPP
+#define LOCKFREE_LIST_HPP
 
 #include <atomic>
 #include <chrono>
@@ -10,7 +10,6 @@
 #include "../platform/optional.hpp"
 
 namespace LockFree {
-
     template <typename T>
     struct Node {
         T data;
