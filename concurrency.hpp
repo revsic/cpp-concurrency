@@ -7,6 +7,7 @@
 #include <list>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <thread>
 #include <type_traits>
 
@@ -21,12 +22,6 @@
 
 #include <chrono>
 
-#ifndef __APPLE__
-#include <optional>
-#else
-#include <experimental/optional>
-#endif
-
 
 namespace platform {
     using namespace std::literals;
@@ -39,161 +34,10 @@ namespace platform {
 }  // namespace platform
 
 
-namespace platform {
-#ifndef __APPLE__
-    using nullopt_t = std::nullopt_t;
-    constexpr auto nullopt = std::nullopt;
-
-    template <typename T>
-    using optional = std::optional<T>;
-
-#else
-    using nullopt_t = std::experimental::nullopt_t;
-    constexpr auto nullopt = std::experimental::nullopt;
-
-    template <typename T>
-    class optional : public std::experimental::optional<T> {
-    private:
-        using super = std::experimental::optional<T>;
-
-    public:
-        constexpr optional() noexcept : super() {
-            // Do Nothing
-        }
-
-        constexpr optional(nullopt_t) noexcept : super(nullopt) {
-            // Do Nothing
-        }
-
-        constexpr optional(optional const& other) noexcept : super(other) {
-            // Do Nothing
-        }
-
-        constexpr optional(optional&& other) noexcept
-            : super(std::move(other)) {
-            // Do Nothing
-        }
-
-        template <typename U>
-        optional(optional<U> const& other) : super(other) {
-            // Do Nothing
-        }
-
-        template <typename U>
-        optional(optional<U>&& other) : super(std::move(other)) {
-            // Do Noting
-        }
-
-        template <typename... Args>
-        constexpr explicit optional(std::in_place_t, Args&&... args)
-            : super(std::in_place, std::forward<Args>(args)...) {
-            // Do Nothing
-        }
-
-        template <typename U, typename... Args>
-        constexpr explicit optional(std::in_place_t,
-                                    std::initializer_list<U> ilist,
-                                    Args&&... args)
-            : super(std::in_place,
-                    std::move(ilist),
-                    std::forward<Args>(args)...) {
-            // Do Nothing
-        }
-
-        template <typename U = typename super::value_type>
-        constexpr optional(U&& value) : super(std::forward<U>(value)) {
-            // Do Nothing
-        }
-
-        optional& operator=(nullopt_t) noexcept {
-            super::operator=(nullopt);
-            return *this;
-        }
-
-        constexpr optional& operator=(optional const& other) {
-            super::operator=(other);
-            return *this;
-        }
-
-        constexpr optional& operator=(optional&& other) noexcept {
-            super::operator=(std::move(other));
-            return *this;
-        }
-
-        template <typename U = T>
-        optional& operator=(U&& value) {
-            super::operator=(std::forward<U>(value));
-            return *this;
-        }
-
-        template <typename U>
-        optional& operator=(optional<U> const& other) {
-            super::operator=(other);
-            return *this;
-        }
-
-        template <typename U>
-        optional& operator=(optional<U>&& other) {
-            super::operator=(std::move(other));
-            return *this;
-        }
-
-        constexpr const T* operator->() const {
-            return super::operator->();
-        }
-
-        constexpr T* operator->() {
-            return super::operator->();
-        }
-
-        constexpr const T& operator*() const& {
-            return super::operator*();
-        }
-
-        constexpr T& operator*() & {
-            return super::operator*();
-        }
-
-        constexpr const T&& operator*() const&& {
-            return std::move(super::operator*());
-        }
-
-        constexpr T&& operator*() && {
-            return std::move(super::operator*());
-        }
-
-        constexpr operator bool() const noexcept {
-            return static_cast<bool>(static_cast<super const&>(*this));
-        }
-
-        constexpr bool has_value() const noexcept {
-            return static_cast<bool>(*this);
-        }
-
-        constexpr T& value() & {
-            return **this;
-        }
-
-        constexpr T const& value() const& {
-            return **this;
-        }
-
-        constexpr T&& value() && {
-            return std::move(**this);
-        }
-
-        constexpr T const&& value() const&& {
-            return std::move(**this);
-        }
-    };
-#endif
-}  // namespace platform
-
-
 template <typename T, typename Channel>
 class ChannelIterator {
 public:
-    ChannelIterator(Channel& channel, platform::optional<T>&& item)
+    ChannelIterator(Channel& channel, std::optional<T>&& item)
         : channel(channel), item(std::move(item)) {
         // Do Nothing
     }
@@ -217,7 +61,7 @@ public:
 
 private:
     Channel& channel;
-    platform::optional<T> item;
+    std::optional<T> item;
 };
 
 
@@ -341,31 +185,31 @@ public:
         cond.notify_all();
     }
 
-    platform::optional<value_type> pop_front() {
+    std::optional<value_type> pop_front() {
         std::unique_lock lock(mutex);
         cond.wait(lock, [&] { return !m_runnable || buffer.size() > 0; });
 
         if (!m_runnable && buffer.size() == 0) {
-            return platform::nullopt;
+            return std::nullopt;
         }
 
         value_type given = std::move(buffer.front());
         buffer.pop_front();
 
         cond.notify_all();
-        return platform::optional<value_type>(std::move(given));
+        return std::make_optional(std::move(given));
     }
 
-    platform::optional<value_type> try_pop() {
+    std::optional<value_type> try_pop() {
         std::unique_lock lock(mutex, std::try_to_lock);
         if (lock.owns_lock() && buffer.size() > 0) {
             value_type given = std::move(buffer.front());
             buffer.pop_front();
 
             cond.notify_all();
-            return platform::optional<value_type>(std::move(given));
+            return std::make_optional(std::move(given));
         }
-        return platform::nullopt;
+        return std::nullopt;
     }
 
     void close() {
@@ -425,21 +269,21 @@ public:
         return *this;
     }
 
-    platform::optional<value_type> Get() {
+    std::optional<value_type> Get() {
         return buffer.pop_front();
     }
 
-    platform::optional<value_type> TryGet() {
+    std::optional<value_type> TryGet() {
         return buffer.try_pop();
     }
 
-    Channel& operator>>(platform::optional<value_type>& get) {
+    Channel& operator>>(std::optional<value_type>& get) {
         get = Get();
         return *this;
     }
 
     Channel& operator>>(value_type& get) {
-        platform::optional<value_type> res = Get();
+        std::optional<value_type> res = Get();
         if (res.has_value()) {
             get = std::move(res.value());
         }
@@ -463,7 +307,7 @@ public:
     }
 
     iterator end() {
-        return iterator(*this, platform::nullopt);
+        return iterator(*this, std::nullopt);
     }
 
 private:
@@ -554,8 +398,8 @@ namespace LockFree {
         }
 
         template <typename U = decltype(platform::prevent_deadlock)>
-        platform::optional<T> pop_front(U const& prevent_deadlock
-                                        = platform::prevent_deadlock) {
+        std::optional<T> pop_front(U const& prevent_deadlock
+                                   = platform::prevent_deadlock) {
             bool run = false;
             Node<T>* node = nullptr;
             do {
@@ -566,10 +410,10 @@ namespace LockFree {
             } while (run
                      && (!node
                          || !m_head.compare_exchange_weak(
-                                node,
-                                node->next,
-                                std::memory_order_relaxed,
-                                std::memory_order_relaxed)));
+                             node,
+                             node->next,
+                             std::memory_order_relaxed,
+                             std::memory_order_relaxed)));
             if (run) {
                 if (node->next == nullptr) {
                     m_tail.store(nullptr, std::memory_order_relaxed);
@@ -578,12 +422,12 @@ namespace LockFree {
                 T res = std::move(node->data);
 
                 delete node;
-                return platform::optional<T>(std::move(res));
+                return std::make_optional(std::move(res));
             }
-            return platform::nullopt;
+            return std::nullopt;
         }
 
-        platform::optional<T> try_pop() {
+        std::optional<T> try_pop() {
             Node<T>* node = m_head.load(std::memory_order_relaxed);
             if (readable() && node
                 && m_head.compare_exchange_weak(node,
@@ -597,9 +441,9 @@ namespace LockFree {
                 T res = std::move(node->data);
 
                 delete node;
-                return platform::optional<T>(std::move(res));
+                return std::make_optional(std::move(res));
             }
-            return platform::nullopt;
+            return std::nullopt;
         }
 
         size_t size() const {

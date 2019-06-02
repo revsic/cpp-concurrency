@@ -1,9 +1,10 @@
 #ifndef CHANNEL_HPP
 #define CHANNEL_HPP
 
+#include <optional>
+
 #include "channel_iter.hpp"
 #include "container/thread_safe.hpp"
-#include "platform/optional.hpp"
 
 template <typename Container>
 class Channel {
@@ -33,21 +34,21 @@ public:
         return *this;
     }
 
-    platform::optional<value_type> Get() {
+    std::optional<value_type> Get() {
         return buffer.pop_front();
     }
 
-    platform::optional<value_type> TryGet() {
+    std::optional<value_type> TryGet() {
         return buffer.try_pop();
     }
 
-    Channel& operator>>(platform::optional<value_type>& get) {
+    Channel& operator>>(std::optional<value_type>& get) {
         get = Get();
         return *this;
     }
 
     Channel& operator>>(value_type& get) {
-        platform::optional<value_type> res = Get();
+        std::optional<value_type> res = Get();
         if (res.has_value()) {
             get = std::move(res.value());
         }
@@ -71,7 +72,7 @@ public:
     }
 
     iterator end() {
-        return iterator(*this, platform::nullopt);
+        return iterator(*this, std::nullopt);
     }
 
 private:

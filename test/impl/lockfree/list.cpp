@@ -112,7 +112,7 @@ TEST_CASE("List::try_pop", "[lockfree/list]") {
     std::vector<std::future<size_t>> futs;
     for (size_t i = 0; i < test_num; ++i) {
         futs.emplace_back(pool.Add([&] {
-            platform::optional<size_t> res;
+            std::optional<size_t> res;
             do {
                 res = list.try_pop();
             } while (!res.has_value());
@@ -149,7 +149,7 @@ TEST_CASE("Concurrently push and try_pop", "[lockfree/list]") {
     auto pop = pop_pool.Add([&] {
         for (size_t i = 0; i < test_num; ++i) {
             pop_futs.push_back(pop_pool.Add([&, i] {
-                platform::optional<size_t> res;
+                std::optional<size_t> res;
                 do {
                     std::this_thread::sleep_for(platform::prevent_deadlock);
                     res = list.try_pop();

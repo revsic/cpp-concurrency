@@ -1,12 +1,12 @@
 #ifndef CHANNEL_ITER_HPP
 #define CHANNEL_ITER_HPP
 
-#include "platform/optional.hpp"
+#include <optional>
 
 template <typename T, typename Channel>
 class ChannelIterator {
 public:
-    ChannelIterator(Channel& channel, platform::optional<T>&& item)
+    ChannelIterator(Channel& channel, std::optional<T>&& item)
         : channel(channel), item(std::move(item)) {
         // Do Nothing
     }
@@ -30,7 +30,7 @@ public:
 
 private:
     Channel& channel;
-    platform::optional<T> item;
+    std::optional<T> item;
 };
 
 #endif

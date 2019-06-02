@@ -5,8 +5,8 @@
 #include <list>
 #include <memory>
 #include <mutex>
+#include <optional>
 
-#include "../platform/optional.hpp"
 #include "ring_buffer.hpp"
 
 template <typename Cont, typename Mutex = std::mutex>
@@ -67,31 +67,31 @@ public:
         cond.notify_all();
     }
 
-    platform::optional<value_type> pop_front() {
+    std::optional<value_type> pop_front() {
         std::unique_lock lock(mutex);
         cond.wait(lock, [&] { return !m_runnable || buffer.size() > 0; });
 
         if (!m_runnable && buffer.size() == 0) {
-            return platform::nullopt;
+            return std::nullopt;
         }
 
         value_type given = std::move(buffer.front());
         buffer.pop_front();
 
         cond.notify_all();
-        return platform::optional<value_type>(std::move(given));
+        return std::make_optional(std::move(given));
     }
 
-    platform::optional<value_type> try_pop() {
+    std::optional<value_type> try_pop() {
         std::unique_lock lock(mutex, std::try_to_lock);
         if (lock.owns_lock() && buffer.size() > 0) {
             value_type given = std::move(buffer.front());
             buffer.pop_front();
 
             cond.notify_all();
-            return platform::optional<value_type>(std::move(given));
+            return std::make_optional(std::move(given));
         }
-        return platform::nullopt;
+        return std::nullopt;
     }
 
     void close() {

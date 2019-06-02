@@ -4,10 +4,10 @@
 #include <atomic>
 #include <chrono>
 #include <memory>
+#include <optional>
 #include <thread>
 
 #include "../platform/constant.hpp"
-#include "../platform/optional.hpp"
 
 namespace LockFree {
     template <typename T>
@@ -86,8 +86,8 @@ namespace LockFree {
         }
 
         template <typename U = decltype(platform::prevent_deadlock)>
-        platform::optional<T> pop_front(U const& prevent_deadlock
-                                        = platform::prevent_deadlock) {
+        std::optional<T> pop_front(U const& prevent_deadlock
+                                   = platform::prevent_deadlock) {
             bool run = false;
             Node<T>* node = nullptr;
             do {
@@ -98,10 +98,10 @@ namespace LockFree {
             } while (run
                      && (!node
                          || !m_head.compare_exchange_weak(
-                                node,
-                                node->next,
-                                std::memory_order_relaxed,
-                                std::memory_order_relaxed)));
+                             node,
+                             node->next,
+                             std::memory_order_relaxed,
+                             std::memory_order_relaxed)));
             if (run) {
                 if (node->next == nullptr) {
                     m_tail.store(nullptr, std::memory_order_relaxed);
@@ -110,12 +110,12 @@ namespace LockFree {
                 T res = std::move(node->data);
 
                 delete node;
-                return platform::optional<T>(std::move(res));
+                return std::make_optional(std::move(res));
             }
-            return platform::nullopt;
+            return std::nullopt;
         }
 
-        platform::optional<T> try_pop() {
+        std::optional<T> try_pop() {
             Node<T>* node = m_head.load(std::memory_order_relaxed);
             if (readable() && node
                 && m_head.compare_exchange_weak(node,
@@ -129,9 +129,9 @@ namespace LockFree {
                 T res = std::move(node->data);
 
                 delete node;
-                return platform::optional<T>(std::move(res));
+                return std::make_optional(std::move(res));
             }
-            return platform::nullopt;
+            return std::nullopt;
         }
 
         size_t size() const {

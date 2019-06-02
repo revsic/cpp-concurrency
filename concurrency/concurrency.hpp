@@ -2,7 +2,6 @@
 #define CONCURRENCY_HPP
 
 #include "impl/platform/constant.hpp"
-#include "impl/platform/optional.hpp"
 #include "impl/container/ring_buffer.hpp"
 #include "impl/container/thread_safe.hpp"
 #include "impl/lockfree/list.hpp"
